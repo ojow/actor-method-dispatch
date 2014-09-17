@@ -11,7 +11,7 @@ An attempt to add some type safety to Akka Actors.
   - No JDK proxies, no bytecode hacks, pure Scala macros.
 
 #### Declaring interface:
-```
+```scala
 trait SimpleActorInterface extends ActorMethods {
   def tellIncrement(): Unit = { thisActor.i += 1 }
   def askCurrentValue: Future[Int] = Future.successful(thisActor.i)
@@ -20,7 +20,7 @@ trait SimpleActorInterface extends ActorMethods {
 ```
 
 #### Inside an Actor:
-```
+```scala
 // selfMethods returns a Receive that routes messages to this Actor method calls
 override def receive = selfMethods[SimpleActorInterface] orElse {
   case m => println(m) // you can still handle messages as usual
@@ -34,7 +34,7 @@ def modifiedBehavior(step: Int): Receive = swappableMethods(new LinkedTo(this) w
 ```
 
 #### Usage:
-```
+```scala
 val myActor = actorMethodsProxy[SimpleActorInterface](sys.actorOf(Props[SimpleActor]))
 myActor.tellIncrement()
 val result: Future[Int] = myActor.askCurrentValue
