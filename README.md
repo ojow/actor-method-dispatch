@@ -15,7 +15,6 @@ An attempt to add some type safety to Akka Actors.
 trait SimpleActorInterface extends ActorMethods {
   def tellIncrement(): Unit = { thisActor.i += 1 }
   def askCurrentValue: Future[Int] = Future.successful(thisActor.i)
-  def askException: Future[Int] = throw new IllegalStateException("It is happening again.")
 }
 ```
 
