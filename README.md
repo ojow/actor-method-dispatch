@@ -8,6 +8,7 @@ An attempt to add some type safety to Akka Actors.
   - Free IDE support - autocomplete and go to implementation.
   - Reduced boilerplate: no need for case classes for messages (and hence no need to repeat message names and parameters in `receive`), no need for extra methods when you need to call one message handler from another.
   - You still have control over all Actor features: raw messages, become, supervision etc.
+  - No JDK proxies, no bytecode hacks, pure Scala macros.
 
 #### Declaring interface:
 ```
