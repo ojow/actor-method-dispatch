@@ -5,7 +5,7 @@ object ActorMethodDispatchBuild extends Build {
    lazy val main = Project("main", file(".")) dependsOn(macroSub, commonSub) aggregate(macroSub, commonSub) settings(
      scalaVersion in Global := "2.11.2",
      organization in Global := "akka",
-     version in Global := "0.1",
+     version in Global := "0.2-SNAPSHOT",
      name := "actor-method-dispatch",
      libraryDependencies ++= Seq(
        "org.scalatest" %% "scalatest" % "2.2.1" % "test"
