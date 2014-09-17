@@ -10,7 +10,7 @@ An attempt to add some type safety to Akka Actors.
   - You still have control over all Actor features: raw messages, become, supervision etc.
   - No JDK proxies, no bytecode hacks, pure Scala macros.
 
-#### Declaring interface:
+#### Methods:
 ```scala
 trait SimpleActorInterface extends ActorMethods {
   override type ActorState = SimpleActor
