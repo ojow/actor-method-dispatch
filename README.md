@@ -13,6 +13,7 @@ An attempt to add some type safety to Akka Actors.
 #### Declaring interface:
 ```scala
 trait SimpleActorInterface extends ActorMethods {
+  override type ActorState = SimpleActor
   def tellIncrement(): Unit = { thisActor.i += 1 }
   def askCurrentValue: Future[Int] = Future.successful(thisActor.i)
 }
