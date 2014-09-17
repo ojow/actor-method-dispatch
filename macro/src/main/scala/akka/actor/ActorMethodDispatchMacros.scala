@@ -64,12 +64,12 @@ object ActorMethodDispatchMacros {
     }
 
     val tellOverrides = tellMethods.map(method2override(_, { case (name, argValues, _) =>
-      q"actorRef ! ActorMethodCall($name, $argValues)"}))
+      q"actorRef ! akka.actor.ActorMethodCall($name, $argValues)"}))
     val askOverrides = askMethods.map(method2override(_, { case (name, argValues, typ) =>
-      q"akka.pattern.ask(actorRef, ActorMethodCall($name, $argValues))($askTimeout).asInstanceOf[$typ]"}))
+      q"akka.pattern.ask(actorRef, akka.actor.ActorMethodCall($name, $argValues))($askTimeout).asInstanceOf[$typ]"}))
 
     c.Expr[T] {q"""
-      new ActorRefWithMethods($ref) with $tpe {
+      new akka.actor.ActorRefWithMethods($ref) with $tpe {
         override protected def thisActor = throw new RuntimeException("This method must not be called on a proxy.")
         ..${tellOverrides ++ askOverrides}
       }
@@ -126,7 +126,7 @@ object ActorMethodDispatchMacros {
       }
 
       val methodNamePattern = pq"${m.name.decodedName.toString}"
-      cq"""ActorMethodCall($methodNamePattern, args) =>
+      cq"""akka.actor.ActorMethodCall($methodNamePattern, args) =>
        ${methodCallHandler(q"$selector.${m.name}(...$methodParams)")}
       """
     }
@@ -141,7 +141,7 @@ object ActorMethodDispatchMacros {
         }
         catch {
           case e: Exception =>
-            sdr ! Status.Failure(e)
+            sdr ! akka.actor.Status.Failure(e)
             throw e
         }
       """))
