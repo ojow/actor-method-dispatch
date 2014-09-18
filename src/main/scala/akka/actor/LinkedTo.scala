@@ -6,6 +6,8 @@ class LinkedTo[T <: Actor](a: T) extends ActorMethods {
 
   override protected def thisActor = a
 
+  override protected def self = thisActor.self
+
 }
 
 

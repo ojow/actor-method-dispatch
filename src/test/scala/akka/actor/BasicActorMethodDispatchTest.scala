@@ -23,8 +23,8 @@ class BasicActorMethodDispatchTest extends FunSuite with ScalaFutures {
     // Calling a 'tell' method, return type Unit
     myActor.tellIncrement()
 
-    // Calling an 'ask' method, returns a Future
-    val result: Future[Int] = myActor.askCurrentValue
+    // Calling an 'ask' method, returns a Reply which can be converted to a Future
+    val result: Future[Int] = myActor.askCurrentValue.toFuture
     assert(result.futureValue == 1)
 
     // Another 'tell' method (calls 'become')
@@ -32,10 +32,10 @@ class BasicActorMethodDispatchTest extends FunSuite with ScalaFutures {
 
     // After 'become' this one increments the counter by 2
     myActor.tellIncrement()
-    assert(myActor.askCurrentValue.futureValue == 3)
+    assert(myActor.askCurrentValue.toFuture.futureValue == 3)
 
-    // Exceptions inside 'ask' methods are automatically passed back as failed futures
-    val exceptionResult = myActor.askException
+    // Exceptions inside 'ask' methods are automatically passed back
+    val exceptionResult = myActor.askException.toFuture
     whenReady(exceptionResult.failed) { e =>
       assert(e.isInstanceOf[IllegalStateException])
     }
@@ -67,7 +67,7 @@ class SimpleActor extends Actor with SimpleActorInterface {
 }
 
 
-// Only allowed public methods are a) starting with 'tell' and returning a Future, b) starting with 'ask' and returning Unit
+// Only allowed public methods are a) starting with 'tell' and returning a Reply, b) starting with 'ask' and returning Unit
 trait SimpleActorInterface extends ActorMethods {
 
   // this one is needed to get access to the host actor internals via method 'thisActor'
@@ -75,9 +75,9 @@ trait SimpleActorInterface extends ActorMethods {
 
   def tellIncrement(): Unit = { thisActor.i += 1 }
 
-  def askCurrentValue: Future[Int] = Future.successful(thisActor.i)
+  def askCurrentValue: Reply[Int] = Reply(thisActor.i)
 
-  def askException: Future[Int] = throw new IllegalStateException("It is happening again.")
+  def askException: Reply[Int] = throw new IllegalStateException("It is happening again.")
 
   def tellBecomeModified(): Unit = {
     thisActor.context.become(thisActor.modifiedBehavior(2))

@@ -3,7 +3,7 @@ package akka.actor
 import akka.util.Timeout
 
 import language.experimental.macros
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 import scala.reflect.macros.blackbox
 
 
@@ -53,25 +53,39 @@ object ActorMethodDispatchMacros {
     import c.universe._
     val tpe = weakTypeOf[T]
 
-    val (tellMethods, askMethods) = selectMethods(c)(tpe.members)
+    val (tellMethods, askReplyMethods) = selectMethods(c)(tpe.members)
 
-    def method2override(m: c.universe.MethodSymbol, body: (Tree, Tree, Tree) => Tree): Tree = {
-      val argsDef = m.paramLists.map(_.map(sym => q"${sym.name.toTermName}: ${sym.typeSignature}"))
+    def method2override(m: c.universe.MethodSymbol, body: (Tree, Tree) => Tree): Tree = {
+      val (params, implicitParams) = paramLists(c)(m)
+      val paramsDef = params.map(_.map(sym => q"${sym.name.toTermName}: ${sym.typeSignature}"))
+      val implicitParamsDef = implicitParams.map(sym => q"${sym.name.toTermName}: ${sym.typeSignature}")
       val argValues = q"List(..${m.paramLists.map(xs => q"List(..${xs.map(sym => q"${sym.name.toTermName}")})")})"
       val name = Literal(Constant(m.name.decodedName.toString))
 
-      q"override def ${m.name}(...$argsDef) = ${body(q"$name", q"$argValues", q"${m.returnType}")}"
+      q"override def ${m.name}(...$paramsDef)(implicit ..$implicitParamsDef) = ${body(q"$name", q"$argValues")}"
     }
 
-    val tellOverrides = tellMethods.map(method2override(_, { case (name, argValues, _) =>
-      q"actorRef ! akka.actor.ActorMethodCall($name, $argValues)"}))
-    val askOverrides = askMethods.map(method2override(_, { case (name, argValues, typ) =>
-      q"akka.pattern.ask(actorRef, akka.actor.ActorMethodCall($name, $argValues))($askTimeout).asInstanceOf[$typ]"}))
+    val tellOverrides = tellMethods.map(m => method2override(m, (name, argValues) =>
+      q"actorRef ! akka.actor.ActorMethodCall($name, $argValues)"))
+
+    val askReplyOverrides = askReplyMethods.map(m => method2override(m, (name, argValues) => {
+      val typeArgs = m.returnType.typeArgs.map(x => tq"$x")
+      q""" new ${m.returnType} {
+         override def value = proxyError
+         override def handleWith(method: akka.actor.CurriedActorMethodCall[..$typeArgs])(implicit sender: ActorRef) = {
+           actorRef ! akka.actor.ActorMethodCall($name, $argValues, Some(method))
+         }
+         override def toFuture: scala.concurrent.Future[..$typeArgs] =
+           akka.pattern.ask(actorRef, akka.actor.ActorMethodCall($name, $argValues))($askTimeout).
+             asInstanceOf[scala.concurrent.Future[..$typeArgs]]
+      } """}))
 
     c.Expr[T] {q"""
       new akka.actor.ActorRefWithMethods($ref) with $tpe {
-        override protected def thisActor = throw new RuntimeException("This method must not be called on a proxy.")
-        ..${tellOverrides ++ askOverrides}
+        private def proxyError = throw new RuntimeException("This method must not be called on a proxy.")
+        override protected def thisActor = proxyError
+        override protected def self = proxyError
+        ..${tellOverrides ++ askReplyOverrides}
       }
     """
     }
@@ -79,10 +93,32 @@ object ActorMethodDispatchMacros {
   }
 
 
+  def replyHandler[T](f: T => Unit): CurriedActorMethodCall[T] = macro replyHandlerImpl[T]
+
+  def replyHandlerImpl[T : c.WeakTypeTag](c: blackbox.Context)(f: c.Expr[T => Unit]): c.Expr[CurriedActorMethodCall[T]] = {
+    import c.universe._
+    val tpe = weakTypeOf[T]
+
+    f.tree match {
+      case q"{((${q"$mods val $tname: $tpt = $expr"}) => $selector.${mname: TermName}(...$args)(${lastArg: TermName}))}" if tname == lastArg =>
+        val name = Literal(Constant(mname.decodedName.toString))
+        c.Expr[CurriedActorMethodCall[T]](q"""CurriedActorMethodCall[$tpe]($name, $args)""")
+
+      case _ => reportError(c, "replyHandler argument must look like a method call without last argument list.")
+    }
+  }
+
+
   private def reportError(c: blackbox.Context, msg: String): Nothing = c.abort(c.enclosingPosition, msg)
 
-  private def selectMethods(c: blackbox.Context)(members: c.universe.MemberScope): (Iterable[c.universe.MethodSymbol],
-                                                                                    Iterable[c.universe.MethodSymbol]) = {
+  private def paramLists(c: blackbox.Context)(method: c.universe.MethodSymbol): (List[List[c.universe.Symbol]], List[c.universe.Symbol]) = {
+    val (params, implicitParamLists) = method.paramLists.partition(_.headOption.exists(! _.isImplicit))
+    val implicitParams = implicitParamLists.headOption.getOrElse(Nil)
+    (params, implicitParams)
+  }
+
+  private def selectMethods(c: blackbox.Context)(members: c.universe.MemberScope):
+        (Iterable[c.universe.MethodSymbol], Iterable[c.universe.MethodSymbol]) = {
     import c.universe._
     def nameFilter(s: String): Boolean = s.startsWith(askMethodPrefix) || s.startsWith(tellMethodPrefix)
 
@@ -106,8 +142,8 @@ object ActorMethodDispatchMacros {
     }
 
     askMethods.foreach { m =>
-      if (!(m.returnType <:< typeOf[Future[_]]))
-        reportError(c, s"Method '${m.name}' must return a Future.")
+      if (!(m.returnType <:< typeOf[Reply[_]]))
+        reportError(c, s"Method '${m.name}' must return a Reply.")
     }
 
     (tellMethods, askMethods)
@@ -116,37 +152,46 @@ object ActorMethodDispatchMacros {
   private def methods2cases(c: blackbox.Context)(tpe: c.universe.Type, selector: c.Tree,
                                                  ec: c.Expr[ExecutionContext]): c.universe.Tree = {
     import c.universe._
-    val (tellMethods, askMethods) = selectMethods(c)(tpe.members)
+    val (tellMethods, askReplyMethods) = selectMethods(c)(tpe.members)
 
-    def methods2case(m: c.universe.MethodSymbol, methodCallHandler: c.Tree => c.Tree): Tree = {
-      val methodParams = m.paramLists.zipWithIndex.map {
+    def methods2case(m: MethodSymbol, methodCallHandler: (Option[c.Tree] => c.Tree, List[Symbol]) => c.Tree): Tree = {
+      val (params, implicitParams) = paramLists(c)(m)
+      val methodParams = params.zipWithIndex.map {
         case (xs, i) => xs.zipWithIndex.map {
           case (param, j) => q"args($i)($j).asInstanceOf[${param.typeSignature}]"
         }
       }
 
       val methodNamePattern = pq"${m.name.decodedName.toString}"
-      cq"""akka.actor.ActorMethodCall($methodNamePattern, args) =>
-       ${methodCallHandler(q"$selector.${m.name}(...$methodParams)")}
+      cq"""akka.actor.ActorMethodCall($methodNamePattern, args, replyTo) =>
+       ${methodCallHandler(impls => q"$selector.${m.name}(...${impls.map(i => methodParams :+ List(i)).getOrElse(methodParams)})", implicitParams)}
       """
     }
 
-    val tellCases = tellMethods.map(methods2case(_, call => call))
-    val askCases = askMethods.map(methods2case(_, call =>
+    val tellCases = tellMethods.map(methods2case(_, (call, _) => call(None)))
+
+    val askReplyCases = askReplyMethods.map(methods2case(_, (call, implParams) => {
+      val replyAddress =
+        if (implParams.nonEmpty) // TODO: correct check
+          Some(q"new ReplyAddress(sender(), replyToCasted)")
+        else None
+
       q"""
-        val sdr = sender()
+        val replyToCasted = replyTo.asInstanceOf[Option[CurriedActorMethodCall[Any]]]
         try {
-          val result = $call
-          result.foreach(sdr ! _)($ec)
+          val result = ${call(replyAddress)}
+          if (result != WillReplyLater) {
+            sender() ! replyToCasted.map(_.uncurry(result.value)).getOrElse(result.value)
+          }
         }
         catch {
           case e: Exception =>
-            sdr ! akka.actor.Status.Failure(e)
+            sender() ! akka.actor.Status.Failure(e)
             throw e
         }
-      """))
+      """}))
 
-    q"{ case ..${tellCases ++ askCases} }"
+    q"{ case ..${tellCases ++ askReplyCases} }"
   }
 }
 
