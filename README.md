@@ -56,12 +56,14 @@ def askCollectData(implicit replyAddress: ReplyAddress[String]): Reply[String] =
 
 // Here we handle replies from provider.askIntData
 def tellIntDataReply(context: SomeContext)(intData: Int): Unit = {
-  // Replying via the reply address saved in askCollectData
+  // Replying to the saved address when we are ready
   thisActor.replyAddress.map(_.sendReply(s"Data collected: $intData"))
 }
 
 // Using from outside is the same:
 val result: Future[String] = actor.askCollectData.toFuture
+// Or from another actor:
+actor.askCollectData.handleWith(replyHandler(tellAcceptStringData))
 ```
 
 See [tests](https://github.com/ojow/actor-method-dispatch/blob/master/src/test/scala/akka/actor) for more examples.
