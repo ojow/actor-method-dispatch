@@ -9,7 +9,7 @@ trait ActorMethods {
 }
 
 
-abstract class ActorRefWithMethods(val actorRef: ActorRef) extends ActorMethods
+abstract class ActorRefWithMethods(val actorRef: ActorRef) extends ActorMethods with Serializable
 
 
 case class ActorMethodCall(methodName: String, args: List[List[Any]])
