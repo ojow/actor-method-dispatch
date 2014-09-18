@@ -40,16 +40,16 @@ myActor.tellIncrement()
 val result: Future[Int] = myActor.askCurrentValue.toFuture
 ```
 
-#### Handling replies inside an Actor
+#### Handling replies inside an Actor:
 ```scala
 var replyAddress: Option[ReplyAddress[String]] = None
 
 def askCollectData(implicit replyAddress: ReplyAddress[String]): Reply[String] = {
-  // Send a message with a reply address and a type safe reply context
-  provider.askIntData.handleWith(replyHandler(tellIntDataReply(someContext)))
-
   // save reply address for later use
   thisActor.replyAddress = Some(replyAddress)
+
+  // Send a message along with meta info on how to handle the reply
+  provider.askIntData.handleWith(replyHandler(tellIntDataReply(someContext)))
 
   WillReplyLater
 }
