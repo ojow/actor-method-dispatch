@@ -4,7 +4,7 @@ An attempt to add some type safety to Akka Actors.
 
 ### Features
 
-  - Type safety in both directions expressed with method calls: set of accepted messages and their return types. Methods can be of two kinds: a) named `tell<something>` and returning `Unit`, b) named `ask<something>` and returning a `Reply` which can be either converted to a `Future` or (when used inside an Actor) used to assign a handler (without any closures stored/passed, everything is serializable!).
+  - Type safety in both directions expressed with method calls: set of accepted messages and their return types. Methods can be of two kinds: a) named `tell<something>` and returning `Unit`, b) named `ask<something>` and returning a `Reply` which can be either converted to a `Future` or (when used inside an Actor) used to assign a handler (without any closures stored/passed, everything is serializable!) or used to stop the target Actor from replying at all.
   - Free IDE support - autocomplete and go to implementation.
   - Reduced boilerplate: no need for case classes for messages (and hence no need to repeat message names and parameters in `receive`), no need for extra methods when you need to call one message handler from another.
   - You still have control over all Actor features: raw messages, become, supervision etc.
@@ -38,6 +38,8 @@ def modifiedBehavior(step: Int): Receive = swappableMethods(new LinkedTo(this) w
 val myActor = actorMethodsProxy[SimpleActorInterface](sys.actorOf(Props[SimpleActor]))
 myActor.tellIncrement()
 val result: Future[Int] = myActor.askCurrentValue.toFuture
+// The reply message will not be sent at all
+myActor.askCurrentValue.ignoreReply()
 ```
 
 #### Handling replies inside an Actor:

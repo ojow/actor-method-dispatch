@@ -34,6 +34,9 @@ class BasicActorMethodDispatchTest extends FunSuite with ScalaFutures {
     myActor.tellIncrement()
     assert(myActor.askCurrentValue.toFuture.futureValue == 3)
 
+    // The reply message will not be sent at all
+    myActor.askCurrentValue.ignoreReply()
+
     // Exceptions inside 'ask' methods are automatically passed back
     val exceptionResult = myActor.askException.toFuture
     whenReady(exceptionResult.failed) { e =>

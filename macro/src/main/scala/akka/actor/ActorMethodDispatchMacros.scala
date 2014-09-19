@@ -72,12 +72,15 @@ object ActorMethodDispatchMacros {
       val typeArgs = m.returnType.typeArgs.map(x => tq"$x")
       q""" new ${m.returnType} {
          override def value = proxyError
-         override def handleWith(method: akka.actor.CurriedActorMethodCall[..$typeArgs])(implicit sender: ActorRef) = {
+         override def handleWith(method: akka.actor.CurriedActorMethodCall[..$typeArgs])(implicit sender: ActorRef): Unit = {
            actorRef ! akka.actor.ActorMethodCall($name, $argValues, Some(method))
          }
          override def toFuture: scala.concurrent.Future[..$typeArgs] =
            akka.pattern.ask(actorRef, akka.actor.ActorMethodCall($name, $argValues))($askTimeout).
              asInstanceOf[scala.concurrent.Future[..$typeArgs]]
+         override def ignoreReply(): Unit = {
+           actorRef ! akka.actor.ActorMethodCall($name, $argValues, Some(DontReply))
+         }
       } """}))
 
     c.Expr[T] {q"""
@@ -102,7 +105,7 @@ object ActorMethodDispatchMacros {
     f.tree match {
       case q"{((${q"$mods val $tname: $tpt = $expr"}) => $selector.${mname: TermName}(...$args)(${lastArg: TermName}))}" if tname == lastArg =>
         val name = Literal(Constant(mname.decodedName.toString))
-        c.Expr[CurriedActorMethodCall[T]](q"""CurriedActorMethodCall[$tpe]($name, $args)""")
+        c.Expr[CurriedActorMethodCall[T]](q"""new CurriedActorMethodCall[$tpe]($name, $args)""")
 
       case _ => reportError(c, "replyHandler argument must look like a method call without last argument list.")
     }
@@ -180,7 +183,7 @@ object ActorMethodDispatchMacros {
         val replyToCasted = replyTo.asInstanceOf[Option[CurriedActorMethodCall[Any]]]
         try {
           val result = ${call(replyAddress)}
-          if (result != WillReplyLater) {
+          if (result != WillReplyLater && replyTo != Some(DontReply)) {
             sender() ! replyToCasted.map(_.uncurry(result.value)).getOrElse(result.value)
           }
         }
