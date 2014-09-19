@@ -15,7 +15,7 @@ An attempt to add some type safety to Akka Actors.
 trait SimpleActorInterface extends ActorMethods {
   override type ActorState = SimpleActor
   def tellIncrement(): Unit = { thisActor.i += 1 }
-  def askCurrentValue: Reply[Int] = Reply(thisActor.i)
+  def askCurrentValue = Reply(thisActor.i)
 }
 ```
 

@@ -78,7 +78,7 @@ trait SimpleActorInterface extends ActorMethods {
 
   def tellIncrement(): Unit = { thisActor.i += 1 }
 
-  def askCurrentValue: Reply[Int] = Reply(thisActor.i)
+  def askCurrentValue = Reply(thisActor.i)
 
   def askException: Reply[Int] = throw new IllegalStateException("It is happening again.")
 

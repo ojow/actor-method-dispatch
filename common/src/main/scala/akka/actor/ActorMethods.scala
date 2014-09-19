@@ -65,7 +65,7 @@ trait Reply[+T] {
 
 object Reply {
 
-  def apply[T](v: T) = new Reply[T] with ReplyStub[T] {
+  def apply[T](v: T): Reply[T] = new Reply[T] with ReplyStub[T] {
 
     override def value = v
 

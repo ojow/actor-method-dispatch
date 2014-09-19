@@ -81,8 +81,8 @@ trait DataProviderInterface extends ActorMethods {
 
   override type ActorState = DataProviderActor
 
-  def askIntData: Reply[Int] = Reply(42)
+  def askIntData = Reply(42)
 
-  def askStringData: Reply[String] = Reply("a")
+  def askStringData = Reply("a")
 
 }
