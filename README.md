@@ -67,5 +67,5 @@ val result: Future[String] = actor.askCollectData.toFuture
 actor.askCollectData.handleWith(replyHandler(anotherActor.tellAcceptStringData))
 ```
 
-See [tests](https://github.com/ojow/actor-method-dispatch/blob/master/src/test/scala/akka/actor) for more examples.
+See [tests](https://github.com/ojow/actor-method-dispatch/blob/master/src/test/scala/ojow/actor) for more examples.
 
