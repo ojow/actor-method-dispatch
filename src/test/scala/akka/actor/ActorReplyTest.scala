@@ -7,7 +7,6 @@ import scala.concurrent.duration._
 import ActorMethodDispatchMacros._
 import scala.concurrent.ExecutionContext.Implicits.global
 
-
 class ActorReplyTest extends FunSuite with ScalaFutures {
   test("Reply test") {
     val sys = ActorSystem("Test")
