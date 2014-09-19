@@ -72,22 +72,19 @@ object ActorMethodDispatchMacros {
       val typeArgs = m.returnType.typeArgs.map(x => tq"$x")
       q""" new ${m.returnType} {
          override def value = proxyError
-         override def handleWith(method: akka.actor.CurriedActorMethodCall[..$typeArgs])(implicit sender: ActorRef): Unit = {
-           actorRef ! akka.actor.ActorMethodCall($name, $argValues, Some(method))
+         override def handleWith(addr: akka.actor.ReplyAddress[..$typeArgs]): Unit = {
+           actorRef ! akka.actor.ActorMethodCall($name, $argValues, addr)
          }
          override def toFuture: scala.concurrent.Future[..$typeArgs] =
-           akka.pattern.ask(actorRef, akka.actor.ActorMethodCall($name, $argValues))($askTimeout).
-             asInstanceOf[scala.concurrent.Future[..$typeArgs]]
-         override def ignoreReply(): Unit = {
-           actorRef ! akka.actor.ActorMethodCall($name, $argValues, Some(DontReply))
-         }
+           akka.pattern.ask(actorRef, akka.actor.ActorMethodCall($name, $argValues,
+             akka.actor.ReplyAddress.replyToSender[Any](None)))($askTimeout).asInstanceOf[scala.concurrent.Future[..$typeArgs]]
       } """}))
 
     c.Expr[T] {q"""
       new akka.actor.ActorRefWithMethods($ref) with $tpe {
         private def proxyError = throw new RuntimeException("This method must not be called on a proxy.")
         override protected def thisActor = proxyError
-        override protected def self = proxyError
+        override protected def self = $ref
         ..${tellOverrides ++ askReplyOverrides}
       }
     """
@@ -96,16 +93,16 @@ object ActorMethodDispatchMacros {
   }
 
 
-  def replyHandler[T](f: T => Unit): CurriedActorMethodCall[T] = macro replyHandlerImpl[T]
+  def replyHandler[T](f: T => Unit): ReplyAddress[T] = macro replyHandlerImpl[T]
 
-  def replyHandlerImpl[T : c.WeakTypeTag](c: blackbox.Context)(f: c.Expr[T => Unit]): c.Expr[CurriedActorMethodCall[T]] = {
+  def replyHandlerImpl[T : c.WeakTypeTag](c: blackbox.Context)(f: c.Expr[T => Unit]): c.Expr[ReplyAddress[T]] = {
     import c.universe._
     val tpe = weakTypeOf[T]
 
     f.tree match {
       case q"{((${q"$mods val $tname: $tpt = $expr"}) => $selector.${mname: TermName}(...$args)(${lastArg: TermName}))}" if tname == lastArg =>
         val name = Literal(Constant(mname.decodedName.toString))
-        c.Expr[CurriedActorMethodCall[T]](q"""new CurriedActorMethodCall[$tpe]($name, $args)""")
+        c.Expr[ReplyAddress[T]](q"""new akka.actor.ReplyAddress[$tpe](Some($selector.self), Some(new CurriedActorMethodCall[$tpe]($name, $args)))""")
 
       case _ => reportError(c, "replyHandler argument must look like a method call without last argument list.")
     }
@@ -166,7 +163,7 @@ object ActorMethodDispatchMacros {
       }
 
       val methodNamePattern = pq"${m.name.decodedName.toString}"
-      cq"""akka.actor.ActorMethodCall($methodNamePattern, args, replyTo) =>
+      cq"""akka.actor.ActorMethodCall($methodNamePattern, args, rawReplyAddr) =>
        ${methodCallHandler(impls => q"$selector.${m.name}(...${impls.map(i => methodParams :+ List(i)).getOrElse(methodParams)})", implicitParams)}
       """
     }
@@ -176,20 +173,20 @@ object ActorMethodDispatchMacros {
     val askReplyCases = askReplyMethods.map(methods2case(_, (call, implParams) => {
       val replyAddress =
         if (implParams.nonEmpty) // TODO: correct check
-          Some(q"new ReplyAddress(sender(), replyToCasted)")
+          Some(q"replyAddr")
         else None
 
       q"""
-        val replyToCasted = replyTo.asInstanceOf[Option[CurriedActorMethodCall[Any]]]
+        val replyAddr = rawReplyAddr.asInstanceOf[ReplyAddress[Any]].fillRef(sender())
         try {
           val result = ${call(replyAddress)}
-          if (result != WillReplyLater && replyTo != Some(DontReply)) {
-            sender() ! replyToCasted.map(_.uncurry(result.value)).getOrElse(result.value)
+          if (result != WillReplyLater) {
+            replyAddr.sendReply(result.value)
           }
         }
         catch {
           case e: Exception =>
-            sender() ! akka.actor.Status.Failure(e)
+            sender() ! akka.actor.Status.Failure(e) // todo: need something better here
             throw e
         }
       """}))
