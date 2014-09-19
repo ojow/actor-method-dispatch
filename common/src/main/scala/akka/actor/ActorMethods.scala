@@ -27,6 +27,24 @@ trait ActorMethodCall extends Serializable {
 
   def exceptionHandler: ReplyAddress[Status.Status]
 
+  def isEmpty: Boolean = false
+
+  def get: ActorMethodCall = this
+
+  def _1: String = methodName
+
+  def _2: List[List[Any]] = args
+
+  def _3: ReplyAddress[Nothing] = replyTo
+
+  def _4: ReplyAddress[Status.Status] = exceptionHandler
+
+}
+
+object ActorMethodCall {
+
+  def unapply(call: ActorMethodCall) = call
+
 }
 
 

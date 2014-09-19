@@ -155,7 +155,7 @@ object ActorMethodDispatchMacros {
     import c.universe._
     val (tellMethods, askReplyMethods) = selectMethods(c)(tpe.members)
 
-    def method2cases(m: MethodSymbol, methodCallHandler: (Option[c.Tree] => c.Tree, List[Symbol]) => c.Tree): List[Tree] = {
+    def method2cases(m: MethodSymbol, methodCallHandler: (Option[c.Tree] => c.Tree, List[Symbol]) => c.Tree): Tree = {
       val (params, implicitParams) = paramLists(c)(m)
       val methodParams = params.zipWithIndex.map {
         case (xs, i) => xs.zipWithIndex.map {
@@ -165,20 +165,12 @@ object ActorMethodDispatchMacros {
 
       val methodNamePattern = pq"${m.name.decodedName.toString}"
       val handler = methodCallHandler(impls => q"$selector.${m.name}(...${impls.map(i => methodParams :+ List(i)).getOrElse(methodParams)})", implicitParams)
-      val case1 = cq"""msg@akka.actor.AmcReplyToSender($methodNamePattern, args) =>
-       val rawReplyAddr = msg.replyTo
-       val rawExceptionHandler = msg.exceptionHandler
-       $handler
-      """
-
-      val case2 = cq"""akka.actor.AmcWithReplyAddress($methodNamePattern, args, rawReplyAddr, rawExceptionHandler) => $handler"""
-
-      List(case1, case2)
+      cq"""akka.actor.ActorMethodCall($methodNamePattern, args, rawReplyAddr, rawExceptionHandler) => $handler"""
     }
 
-    val tellCases = tellMethods.flatMap(method2cases(_, (call, _) => call(None)))
+    val tellCases = tellMethods.map(method2cases(_, (call, _) => call(None)))
 
-    val askReplyCases = askReplyMethods.flatMap(method2cases(_, (call, implParams) => {
+    val askReplyCases = askReplyMethods.map(method2cases(_, (call, implParams) => {
       val replyAddress =  if (implParams.nonEmpty) Some(q"replyAddr") else None // TODO: correct check
 
       q"""
