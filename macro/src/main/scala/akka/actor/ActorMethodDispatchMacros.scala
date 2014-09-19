@@ -66,7 +66,7 @@ object ActorMethodDispatchMacros {
     }
 
     val tellOverrides = tellMethods.map(m => method2override(m, (name, argValues) =>
-      q"actorRef ! akka.actor.ActorMethodCall($name, $argValues)"))
+      q"actorRef ! akka.actor.AmcReplyToSender($name, $argValues)"))
 
     val askReplyOverrides = askReplyMethods.map(m => method2override(m, (name, argValues) => {
       val typeArgs = m.returnType.typeArgs.map(x => tq"$x")
@@ -74,11 +74,11 @@ object ActorMethodDispatchMacros {
          override def value = proxyError
          override def handleWith(addr: akka.actor.ReplyAddress[..$typeArgs],
            exceptionHandler: ReplyAddress[Status.Status] = ReplyAddress.replyToSender(None)): Unit = {
-             actorRef ! akka.actor.ActorMethodCall($name, $argValues, addr, exceptionHandler)
+             actorRef ! akka.actor.AmcWithReplyAddress($name, $argValues, addr, exceptionHandler)
          }
          override def toFuture: scala.concurrent.Future[..$typeArgs] =
-           akka.pattern.ask(actorRef, akka.actor.ActorMethodCall($name, $argValues,
-             akka.actor.ReplyAddress.replyToSender[Any](None)))($askTimeout).asInstanceOf[scala.concurrent.Future[..$typeArgs]]
+           akka.pattern.ask(actorRef, akka.actor.AmcReplyToSender($name, $argValues))($askTimeout).
+             asInstanceOf[scala.concurrent.Future[..$typeArgs]]
       } """}))
 
     c.Expr[T] {q"""
@@ -155,7 +155,7 @@ object ActorMethodDispatchMacros {
     import c.universe._
     val (tellMethods, askReplyMethods) = selectMethods(c)(tpe.members)
 
-    def methods2case(m: MethodSymbol, methodCallHandler: (Option[c.Tree] => c.Tree, List[Symbol]) => c.Tree): Tree = {
+    def method2cases(m: MethodSymbol, methodCallHandler: (Option[c.Tree] => c.Tree, List[Symbol]) => c.Tree): List[Tree] = {
       val (params, implicitParams) = paramLists(c)(m)
       val methodParams = params.zipWithIndex.map {
         case (xs, i) => xs.zipWithIndex.map {
@@ -164,18 +164,22 @@ object ActorMethodDispatchMacros {
       }
 
       val methodNamePattern = pq"${m.name.decodedName.toString}"
-      cq"""akka.actor.ActorMethodCall($methodNamePattern, args, rawReplyAddr, rawExceptionHandler) =>
-       ${methodCallHandler(impls => q"$selector.${m.name}(...${impls.map(i => methodParams :+ List(i)).getOrElse(methodParams)})", implicitParams)}
+      val handler = methodCallHandler(impls => q"$selector.${m.name}(...${impls.map(i => methodParams :+ List(i)).getOrElse(methodParams)})", implicitParams)
+      val case1 = cq"""msg@akka.actor.AmcReplyToSender($methodNamePattern, args) =>
+       val rawReplyAddr = msg.replyTo
+       val rawExceptionHandler = msg.exceptionHandler
+       $handler
       """
+
+      val case2 = cq"""akka.actor.AmcWithReplyAddress($methodNamePattern, args, rawReplyAddr, rawExceptionHandler) => $handler"""
+
+      List(case1, case2)
     }
 
-    val tellCases = tellMethods.map(methods2case(_, (call, _) => call(None)))
+    val tellCases = tellMethods.flatMap(method2cases(_, (call, _) => call(None)))
 
-    val askReplyCases = askReplyMethods.map(methods2case(_, (call, implParams) => {
-      val replyAddress =
-        if (implParams.nonEmpty) // TODO: correct check
-          Some(q"replyAddr")
-        else None
+    val askReplyCases = askReplyMethods.flatMap(method2cases(_, (call, implParams) => {
+      val replyAddress =  if (implParams.nonEmpty) Some(q"replyAddr") else None // TODO: correct check
 
       q"""
         val replyAddr = rawReplyAddr.asInstanceOf[ReplyAddress[Any]].fillRef(sender())

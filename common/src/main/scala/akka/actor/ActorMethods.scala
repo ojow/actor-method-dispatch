@@ -17,18 +17,38 @@ trait ActorMethods {
 abstract class ActorRefWithMethods(val actorRef: ActorRef) extends ActorMethods with Serializable
 
 
-case class ActorMethodCall(methodName: String, args: List[List[Any]],
-                           replyTo: ReplyAddress[Nothing] = ReplyAddress.replyToSender(None),
-                           exceptionHandler: ReplyAddress[Status.Status] = ReplyAddress.replyToSender(None))
+trait ActorMethodCall extends Serializable {
 
+  val methodName: String
 
-class CurriedActorMethodCall[-T](val methodName: String, val args: List[List[Any]]) extends Serializable {
+  val args: List[List[Any]]
+  
+  def replyTo: ReplyAddress[Nothing]
 
-  def uncurry(value: T) = ActorMethodCall(methodName, args :+ List(value))
+  def exceptionHandler: ReplyAddress[Status.Status]
 
 }
 
-object DontReply extends CurriedActorMethodCall[Any]("", Nil)
+
+case class AmcReplyToSender(methodName: String, args: List[List[Any]]) extends ActorMethodCall {
+
+  override def replyTo: ReplyAddress[Nothing] = ReplyAddress.replyToSender(None)
+
+  override def exceptionHandler: ReplyAddress[Status.Status] = ReplyAddress.replyToSender(None)
+
+}
+
+
+case class AmcWithReplyAddress(methodName: String, args: List[List[Any]], 
+             replyTo: ReplyAddress[Nothing], exceptionHandler: ReplyAddress[Status.Status]) extends ActorMethodCall
+
+
+case class CurriedActorMethodCall[-T](methodName: String, args: List[List[Any]]) {
+
+  def uncurry(value: T) = AmcReplyToSender(methodName, args :+ List(value))
+
+}
+
 
 
 trait Reply[+T] {
@@ -39,7 +59,7 @@ trait Reply[+T] {
 
   def toFuture: Future[T]
 
-  final def ignoreReply(): Unit = handleWith(ReplyAddress.nullAddress)
+  final def ignoreReply(): Unit = handleWith(ReplyAddress.dontReply)
 
 }
 
@@ -75,9 +95,7 @@ object WillReplyLater extends Reply[Nothing] with ReplyStub[Nothing] {
 class ReplyAddress[-T](val actorRef: Option[ActorRef], val call: Option[CurriedActorMethodCall[T]] = None) extends Serializable {
 
   def sendReply(value: T): Unit = {
-    if (call != Some(DontReply)) {
-      actorRef.foreach(_ ! call.map(_.uncurry(value)).getOrElse(value))
-    }
+    actorRef.foreach(_ ! call.map(_.uncurry(value)).getOrElse(value))
   }
 
   def fillRef(newActorRef: ActorRef): ReplyAddress[T] =
@@ -87,7 +105,7 @@ class ReplyAddress[-T](val actorRef: Option[ActorRef], val call: Option[CurriedA
 
 object ReplyAddress {
 
-  implicit val nullAddress = new ReplyAddress[Any](None) {
+  implicit val dontReply = new ReplyAddress[Any](None) {
 
     override def sendReply(value: Any): Unit = {}
 
