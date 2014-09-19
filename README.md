@@ -12,7 +12,7 @@ An attempt to add some type safety to Akka Actors.
 
 #### Methods:
 ```scala
-trait SimpleActorInterface extends ActorMethods {
+trait ActorInterface extends ActorMethods {
   override type ActorState = SimpleActor
   def tellIncrement(): Unit = { thisActor.i += 1 }
   def askCurrentValue = Reply(thisActor.i)
@@ -22,20 +22,19 @@ trait SimpleActorInterface extends ActorMethods {
 #### Inside an Actor:
 ```scala
 // selfMethods returns a Receive that routes messages to this Actor method calls
-override def receive = selfMethods[SimpleActorInterface] orElse {
+override def receive = selfMethods[ActorInterface] orElse {
   case m => println(m) // you can still handle messages as usual
 }
 
 // swappableMethods returns a Receive that routes messages to its own instance of ActorMethods
-// LinkedTo(this) is here just to reduce boilerplate so you don't have to override 'thisActor' manually
-def modifiedBehavior(step: Int): Receive = swappableMethods(new LinkedTo(this) with SimpleActorInterface {
+def behavior(step: Int): Receive = swappableMethods(new LinkedTo(this) with ActorInterface {
   override def tellIncrement(): Unit = { thisActor.i += step }
 })
 ```
 
 #### Usage:
 ```scala
-val myActor = actorMethodsProxy[SimpleActorInterface](sys.actorOf(Props[SimpleActor]))
+val myActor = actorMethodsProxy[ActorInterface](sys.actorOf(Props[SimpleActor]))
 myActor.tellIncrement()
 val result: Future[Int] = myActor.askCurrentValue.toFuture
 // The reply message will not be sent at all
