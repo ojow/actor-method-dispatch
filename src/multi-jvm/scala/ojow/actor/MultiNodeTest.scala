@@ -1,6 +1,7 @@
-package akka.actor
+package ojow.actor
 
-import akka.actor.ActorMethodDispatchMacros._
+import akka.actor._
+import ActorMethodDispatchMacros._
 import akka.remote.testkit.{MultiNodeSpecCallbacks, MultiNodeConfig}
 import akka.testkit.EventFilter
 import akka.testkit.TestEvent

@@ -1,10 +1,11 @@
-package akka.actor
+package ojow.actor
 
 import akka.util.Timeout
 
 import language.experimental.macros
 import scala.concurrent.ExecutionContext
 import scala.reflect.macros.blackbox
+import akka.actor._
 
 
 object ActorMethodDispatchMacros {
@@ -66,23 +67,23 @@ object ActorMethodDispatchMacros {
     }
 
     val tellOverrides = tellMethods.map(m => method2override(m, (name, argValues) =>
-      q"actorRef ! akka.actor.AmcReplyToSender($name, $argValues)"))
+      q"actorRef ! ojow.actor.AmcReplyToSender($name, $argValues)"))
 
     val askReplyOverrides = askReplyMethods.map(m => method2override(m, (name, argValues) => {
       val typeArgs = m.returnType.typeArgs.map(x => tq"$x")
       q""" new ${m.returnType} {
          override def value = proxyError
-         override def handleWith(addr: akka.actor.ReplyAddress[..$typeArgs],
+         override def handleWith(addr: ojow.actor.ReplyAddress[..$typeArgs],
            exceptionHandler: ReplyAddress[Status.Status] = ReplyAddress.replyToSender(None)): Unit = {
-             actorRef ! akka.actor.AmcWithReplyAddress($name, $argValues, addr, exceptionHandler)
+             actorRef ! ojow.actor.AmcWithReplyAddress($name, $argValues, addr, exceptionHandler)
          }
          override def toFuture: scala.concurrent.Future[..$typeArgs] =
-           akka.pattern.ask(actorRef, akka.actor.AmcReplyToSender($name, $argValues))($askTimeout).
+           akka.pattern.ask(actorRef, ojow.actor.AmcReplyToSender($name, $argValues))($askTimeout).
              asInstanceOf[scala.concurrent.Future[..$typeArgs]]
       } """}))
 
     c.Expr[T] {q"""
-      new akka.actor.ActorRefWithMethods($ref) with $tpe {
+      new ojow.actor.ActorRefWithMethods($ref) with $tpe {
         private def proxyError = throw new RuntimeException("This method must not be called on a proxy.")
         override protected def thisActor = proxyError
         override protected def self = $ref
@@ -103,7 +104,7 @@ object ActorMethodDispatchMacros {
     f.tree match {
       case q"{((${q"$mods val $tname: $tpt = $expr"}) => $selector.${mname: TermName}(...$args)(${lastArg: TermName}))}" if tname == lastArg =>
         val name = Literal(Constant(mname.decodedName.toString))
-        c.Expr[ReplyAddress[T]](q"""new akka.actor.ReplyAddress[$tpe](Some($selector.self), Some(new CurriedActorMethodCall[$tpe]($name, $args)))""")
+        c.Expr[ReplyAddress[T]](q"""new ojow.actor.ReplyAddress[$tpe](Some($selector.self), Some(new CurriedActorMethodCall[$tpe]($name, $args)))""")
 
       case _ => reportError(c, "replyHandler argument must look like a method call without last argument list.")
     }
@@ -165,7 +166,7 @@ object ActorMethodDispatchMacros {
 
       val methodNamePattern = pq"${m.name.decodedName.toString}"
       val handler = methodCallHandler(impls => q"$selector.${m.name}(...${impls.map(i => methodParams :+ List(i)).getOrElse(methodParams)})", implicitParams)
-      cq"""akka.actor.ActorMethodCall($methodNamePattern, args, rawReplyAddr, rawExceptionHandler) => $handler"""
+      cq"""ojow.actor.ActorMethodCall($methodNamePattern, args, rawReplyAddr, rawExceptionHandler) => $handler"""
     }
 
     val tellCases = tellMethods.map(method2cases(_, (call, _) => call(None)))

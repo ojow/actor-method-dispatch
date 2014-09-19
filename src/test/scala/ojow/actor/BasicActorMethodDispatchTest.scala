@@ -1,9 +1,10 @@
-package akka.actor
+package ojow.actor
 
 import akka.util.Timeout
 import org.scalatest.FunSuite
 import org.scalatest.concurrent.ScalaFutures
 import scala.concurrent.duration._
+import akka.actor._
 import ActorMethodDispatchMacros._
 import scala.concurrent.ExecutionContext.Implicits.global
 

@@ -1,4 +1,6 @@
-package akka.actor
+package ojow.actor
+
+import akka.actor._
 
 import scala.concurrent.Future
 

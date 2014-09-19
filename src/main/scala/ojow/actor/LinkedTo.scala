@@ -1,4 +1,7 @@
-package akka.actor
+package ojow.actor
+
+import akka.actor._
+
 
 class LinkedTo[T <: Actor](a: T) extends ActorMethods {
 
