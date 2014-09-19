@@ -69,3 +69,12 @@ actor.askCollectData.handleWith(replyHandler(anotherActor.tellAcceptStringData))
 
 See [tests](https://github.com/ojow/actor-method-dispatch/blob/master/src/test/scala/ojow/actor) for more examples.
 
+#### How it works
+There are 3 kind of macros:
+  1. For creating proxies. They just override methods from your trait with code to send `ActorMethodCall` messages.
+  2. For creating `Receive`s. They build a `Receive` from a list of `case` clauses to match `ActorMethodCall` messages and call respective methods.
+  3. For converting a curried method call (without the last argument list) to a `ReplyAddress` that is then used to route the reply.
+
+See [macro sources](https://github.com/ojow/actor-method-dispatch/blob/master/macro/src/main/scala/ojow/actor) for details.
+
+
