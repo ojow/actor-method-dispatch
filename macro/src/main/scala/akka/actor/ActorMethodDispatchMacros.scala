@@ -72,8 +72,9 @@ object ActorMethodDispatchMacros {
       val typeArgs = m.returnType.typeArgs.map(x => tq"$x")
       q""" new ${m.returnType} {
          override def value = proxyError
-         override def handleWith(addr: akka.actor.ReplyAddress[..$typeArgs]): Unit = {
-           actorRef ! akka.actor.ActorMethodCall($name, $argValues, addr)
+         override def handleWith(addr: akka.actor.ReplyAddress[..$typeArgs],
+           exceptionHandler: ReplyAddress[Status.Status] = ReplyAddress.replyToSender(None)): Unit = {
+             actorRef ! akka.actor.ActorMethodCall($name, $argValues, addr, exceptionHandler)
          }
          override def toFuture: scala.concurrent.Future[..$typeArgs] =
            akka.pattern.ask(actorRef, akka.actor.ActorMethodCall($name, $argValues,
@@ -163,7 +164,7 @@ object ActorMethodDispatchMacros {
       }
 
       val methodNamePattern = pq"${m.name.decodedName.toString}"
-      cq"""akka.actor.ActorMethodCall($methodNamePattern, args, rawReplyAddr) =>
+      cq"""akka.actor.ActorMethodCall($methodNamePattern, args, rawReplyAddr, rawExceptionHandler) =>
        ${methodCallHandler(impls => q"$selector.${m.name}(...${impls.map(i => methodParams :+ List(i)).getOrElse(methodParams)})", implicitParams)}
       """
     }
@@ -178,6 +179,7 @@ object ActorMethodDispatchMacros {
 
       q"""
         val replyAddr = rawReplyAddr.asInstanceOf[ReplyAddress[Any]].fillRef(sender())
+        val exceptionHandler = rawExceptionHandler.asInstanceOf[ReplyAddress[Any]].fillRef(sender())
         try {
           val result = ${call(replyAddress)}
           if (result != WillReplyLater) {
@@ -186,7 +188,7 @@ object ActorMethodDispatchMacros {
         }
         catch {
           case e: Exception =>
-            sender() ! akka.actor.Status.Failure(e) // todo: need something better here
+            exceptionHandler.sendReply(akka.actor.Status.Failure(e))
             throw e
         }
       """}))

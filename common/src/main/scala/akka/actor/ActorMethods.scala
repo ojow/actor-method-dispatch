@@ -18,7 +18,8 @@ abstract class ActorRefWithMethods(val actorRef: ActorRef) extends ActorMethods 
 
 
 case class ActorMethodCall(methodName: String, args: List[List[Any]],
-                           replyTo: ReplyAddress[Nothing] = ReplyAddress.replyToSender(None))
+                           replyTo: ReplyAddress[Nothing] = ReplyAddress.replyToSender(None),
+                           exceptionHandler: ReplyAddress[Status.Status] = ReplyAddress.replyToSender(None))
 
 
 class CurriedActorMethodCall[-T](val methodName: String, val args: List[List[Any]]) extends Serializable {
@@ -34,7 +35,7 @@ trait Reply[+T] {
 
   def value: T
 
-  def handleWith(method: ReplyAddress[T])
+  def handleWith(method: ReplyAddress[T], exceptionHandler: ReplyAddress[Status.Status] = ReplyAddress.replyToSender(None))
 
   def toFuture: Future[T]
 
@@ -55,7 +56,7 @@ object Reply {
 
 trait ReplyStub[+T] extends Reply[T] {
 
-  override def handleWith(method: ReplyAddress[T]) = error
+  override def handleWith(method: ReplyAddress[T], exceptionHandler: ReplyAddress[Status.Status] = ReplyAddress.replyToSender(None)) = error
 
   override def toFuture: Future[T] = error
 
