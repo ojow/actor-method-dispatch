@@ -26,7 +26,7 @@ override def receive = selfMethods[ActorInterface] orElse {
   case m => println(m) // you can still handle messages as usual
 }
 
-// swappableMethods returns a Receive that routes messages to its own instance of ActorMethods
+// swappableMethods returns a Receive that routes messages to its own copy of ActorMethods
 def behavior(step: Int): Receive = swappableMethods(new LinkedTo(this) with ActorInterface {
   override def tellIncrement(): Unit = { thisActor.i += step }
 })
