@@ -9,16 +9,20 @@ import org.scalatest.{WordSpecLike, Matchers, BeforeAndAfterAll}
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
-
-object MultiNodeSampleConfig extends MultiNodeConfig {
-  val node1 = role("node1")
-  val node2 = role("node2")
-}
-
 import akka.remote.testkit.MultiNodeSpec
 import akka.testkit.ImplicitSender
 
+
+object MultiNodeSampleConfig extends MultiNodeConfig {
+
+  val node1 = role("node1")
+
+  val node2 = role("node2")
+
+}
+
 class MultiNodeTestMultiJvmNode1 extends MultiNodeSample
+
 class MultiNodeTestMultiJvmNode2 extends MultiNodeSample
 
 object MultiNodeSample {
