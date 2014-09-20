@@ -24,7 +24,7 @@ object ActorMethodDispatchMacros {
    *     selfMethods[ActorInterface]
    * the macro returns
    *     {
-   *       case ActorMethodCall("tellDoSomething", args, rawReplyAddr, rawExceptionHandler) => tellDoSeomthing()
+   *       case ActorMethodCall("tellDoSomething", args, rawReplyAddr, rawExceptionHandler) => tellDoSomething()
    *     }
    */
   def selfMethods[T <: ActorMethods](implicit ec: ExecutionContext): Actor.Receive = macro selfMethodsImpl[T]
@@ -39,7 +39,17 @@ object ActorMethodDispatchMacros {
 
 
   /**
-   * Same as 'selfMethods' exception methods are called on the given object.
+   * Works similar to 'selfMethods' except methods are called on the given object.
+   * So the returned expression looks like this:
+   *
+   *   new PartialFunction[Any, Unit] {
+   *     val methodsObj = theGivenObject
+   *     val recv: Receive = {
+   *       case ActorMethodCall("tellDoSomething", args, rawReplyAddr, rawExceptionHandler) => methodsObj.tellDoSomething()
+   *     }
+   *     override def isDefinedAt(x: Any) = recv.isDefinedAt(x)
+   *     override def apply(v1: Any) = recv.apply(v1)
+   *   }
    */
   def swappableMethods[T <: ActorMethods](obj: => T)(implicit ec: ExecutionContext): Actor.Receive =
     macro swappableMethodsImpl[T]
@@ -62,7 +72,7 @@ object ActorMethodDispatchMacros {
 
 
   /**
-   * Returns an anonymous class instantion expression. The class is given T with methods (suitable for message
+   * Returns an anonymous class instantion expression. The class is the given 'T' with methods (suitable for message
    * dispatching) overriden with code than makes it possible to send messages to the given ActorRef.
    * For example if there is a
    *     trait ActorInterface extends ActorMethods { def tellDoSomething(): Unit = ??? }
