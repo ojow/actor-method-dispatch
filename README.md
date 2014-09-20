@@ -32,7 +32,7 @@ def behavior(step: Int): Receive = swappableMethods(new LinkedTo(this) with Acto
 })
 ```
 
-#### Usage:
+#### Calling methods/sending messages:
 ```scala
 val myActor = actorMethodsProxy[ActorInterface](sys.actorOf(Props[SimpleActor]))
 myActor.tellIncrement()
@@ -76,5 +76,7 @@ There are 3 kind of macros:
   3. For creating `ReplyAddress`es (to handle replies) from curried method calls (without the last argument list).
 
 See [macro sources](https://github.com/ojow/actor-method-dispatch/blob/master/macro/src/main/scala/ojow/actor) for details.
+
+To use in another project clone or download this one, run `sbt publishLocal` and then add `"akka" %% "actor-method-dispatch" % "0.2-SNAPSHOT"` dependency to the target project's build.
 
 
