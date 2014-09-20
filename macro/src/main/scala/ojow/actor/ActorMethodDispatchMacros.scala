@@ -15,6 +15,18 @@ object ActorMethodDispatchMacros {
   def tellMethodPrefix = "tell"
 
 
+  /**
+   * Return a set of { case ... => ... } clauses which is a Receive that matches ActorMethodCall messages and
+   * calls corresponding methods on 'this'.
+   * For example if there is a
+   *     trait ActorInterface extends ActorMethods { def tellDoSomething(): Unit = ??? }
+   * and we call
+   *     selfMethods[ActorInterface]
+   * the macro returns
+   *     {
+   *       case ActorMethodCall("tellDoSomething", args, rawReplyAddr, rawExceptionHandler) => tellDoSeomthing()
+   *     }
+   */
   def selfMethods[T <: ActorMethods](implicit ec: ExecutionContext): Actor.Receive = macro selfMethodsImpl[T]
 
   def selfMethodsImpl[T <: ActorMethods : c.WeakTypeTag](c: blackbox.Context)(
@@ -22,10 +34,13 @@ object ActorMethodDispatchMacros {
     import c.universe._
     val tpe = weakTypeOf[T]
 
-    c.Expr[Actor.Receive](methods2cases(c)(tpe, q"this", ec))
+    c.Expr[Actor.Receive](methodsToCases(c)(tpe, q"this", ec))
   }
 
 
+  /**
+   * Same as 'selfMethods' exception methods are called on the given object.
+   */
   def swappableMethods[T <: ActorMethods](obj: => T)(implicit ec: ExecutionContext): Actor.Receive =
     macro swappableMethodsImpl[T]
 
@@ -37,7 +52,7 @@ object ActorMethodDispatchMacros {
     c.Expr[Actor.Receive](q"""
       new PartialFunction[Any, Unit] {
         val methodsObj = $obj
-        val recv: Receive = ${methods2cases(c)(tpe, q"methodsObj", ec)}
+        val recv: Receive = ${methodsToCases(c)(tpe, q"methodsObj", ec)}
         override def isDefinedAt(x: Any) = recv.isDefinedAt(x)
         override def apply(v1: Any) = recv.apply(v1)
       }
@@ -46,6 +61,18 @@ object ActorMethodDispatchMacros {
   }
 
 
+  /**
+   * Returns an anonymous class instantion expression. The class is given T with methods (suitable for message
+   * dispatching) overriden with code than makes it possible to send messages to the given ActorRef.
+   * For example if there is a
+   *     trait ActorInterface extends ActorMethods { def tellDoSomething(): Unit = ??? }
+   * and we call
+   *     actorMethodsProxy[ActorInterface](someActor)
+   * the macro returns the following expression:
+   *     new ActorInterface {
+   *       override def tellDoSomething(): Unit = { someActor ! AmcReplyToSender("tellDoSomething", List(List()))
+   *     }
+   */
   def actorMethodsProxy[T <: ActorMethods](ref: ActorRef)(implicit askTimeout: Timeout,
                                                           ec: ExecutionContext): T = macro actorMethodsProxyImpl[T]
 
@@ -94,7 +121,15 @@ object ActorMethodDispatchMacros {
 
   }
 
-
+  /**
+   * Converts a method call without last parameter list to creation of a corresponding ReplyAddress.
+   * For example if there is a
+   *     def tellAcceptInt(context: MyContext)(value: Int)
+   * and we call
+   *     replyHandler(actorMethods.tellAcceptInt(myContext))
+   * we get
+   *     new ReplyAddress(Some(actorMethods.self), Some(new CurriedActorMethodCall("tellAcceptInt", List(List(context)))))
+   */
   def replyHandler[T](f: T => Unit): ReplyAddress[T] = macro replyHandlerImpl[T]
 
   def replyHandlerImpl[T : c.WeakTypeTag](c: blackbox.Context)(f: c.Expr[T => Unit]): c.Expr[ReplyAddress[T]] = {
@@ -113,12 +148,18 @@ object ActorMethodDispatchMacros {
 
   private def reportError(c: blackbox.Context, msg: String): Nothing = c.abort(c.enclosingPosition, msg)
 
+  /**
+   * Partitions regular and implicit parameters of a method
+   */
   private def paramLists(c: blackbox.Context)(method: c.universe.MethodSymbol): (List[List[c.universe.Symbol]], List[c.universe.Symbol]) = {
     val (params, implicitParamLists) = method.paramLists.partition(_.headOption.exists(! _.isImplicit))
     val implicitParams = implicitParamLists.headOption.getOrElse(Nil)
     (params, implicitParams)
   }
 
+  /**
+   * Selects and validates methods suitable for message dispatching
+   */
   private def selectMethods(c: blackbox.Context)(members: c.universe.MemberScope):
         (Iterable[c.universe.MethodSymbol], Iterable[c.universe.MethodSymbol]) = {
     import c.universe._
@@ -151,12 +192,16 @@ object ActorMethodDispatchMacros {
     (tellMethods, askMethods)
   }
 
-  private def methods2cases(c: blackbox.Context)(tpe: c.universe.Type, selector: c.Tree,
+  /**
+   * Converts suitable for message dispatching methods of type 'tpe' to a set of { case ... => ... } clauses
+   * which is a Receive that matches ActorMethodCall messages and calls corresponding methods
+   */
+  private def methodsToCases(c: blackbox.Context)(tpe: c.universe.Type, selector: c.Tree,
                                                  ec: c.Expr[ExecutionContext]): c.universe.Tree = {
     import c.universe._
     val (tellMethods, askReplyMethods) = selectMethods(c)(tpe.members)
 
-    def method2cases(m: MethodSymbol, methodCallHandler: (Option[c.Tree] => c.Tree, List[Symbol]) => c.Tree): Tree = {
+    def methodToCase(m: MethodSymbol, methodCallHandler: (Option[c.Tree] => c.Tree, List[Symbol]) => c.Tree): Tree = {
       val (params, implicitParams) = paramLists(c)(m)
       val methodParams = params.zipWithIndex.map {
         case (xs, i) => xs.zipWithIndex.map {
@@ -169,9 +214,9 @@ object ActorMethodDispatchMacros {
       cq"""ojow.actor.ActorMethodCall($methodNamePattern, args, rawReplyAddr, rawExceptionHandler) => $handler"""
     }
 
-    val tellCases = tellMethods.map(method2cases(_, (call, _) => call(None)))
+    val tellCases = tellMethods.map(methodToCase(_, (call, _) => call(None)))
 
-    val askReplyCases = askReplyMethods.map(method2cases(_, (call, implParams) => {
+    val askReplyCases = askReplyMethods.map(methodToCase(_, (call, implParams) => {
       val replyAddress =  if (implParams.nonEmpty) Some(q"replyAddr") else None // TODO: correct check
 
       q"""
