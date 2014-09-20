@@ -77,6 +77,6 @@ There are 3 kind of macros:
 
 See [macro sources](https://github.com/ojow/actor-method-dispatch/blob/master/macro/src/main/scala/ojow/actor) for details.
 
-To use in another project clone or download this one, run `sbt publishLocal` and then add `"akka" %% "actor-method-dispatch" % "0.2-SNAPSHOT"` dependency to the target project's build.
+The artifacts are not getting published yet, so to use in another project clone or download this one, run `sbt publishLocal` and then add `"akka" %% "actor-method-dispatch" % "0.2-SNAPSHOT"` dependency to the target project's build.
 
 
