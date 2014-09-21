@@ -5,7 +5,7 @@ An attempt to add some type safety to Akka Actors.
 ### Features
 
   - Type safety in both directions expressed with method calls: set of accepted messages and their return types. Methods can be of two kinds: a) named `tell<something>` and returning `Unit`, b) named `ask<something>` and returning a `Reply` which can be either converted to a `Future` or used to assign a handler within an Actor (no closures stored/passed, everything is serializable!) or used to stop the actor from replying at all.
-  - Free IDE support - autocomplete and go to implementation.
+  - Autocompletion and "go to implementation" in IDE's.
   - Reduced boilerplate: no need for case classes for messages (and hence no need to repeat message names and parameters in `receive`), no need for extra methods when you need to call one message handler from another.
   - You still have control over all Actor features: raw messages, become, supervision etc.
   - No JDK proxies, no bytecode hacks, pure Scala macros.
@@ -13,7 +13,7 @@ An attempt to add some type safety to Akka Actors.
 #### Methods:
 ```scala
 trait ActorInterface extends ActorMethods {
-  override type ActorState = SimpleActor
+  override type ActorState = SimpleActor // class SimpleActor extends Actor
   def tellIncrement(): Unit = { thisActor.i += 1 }
   def askCurrentValue = Reply(thisActor.i)
 }
