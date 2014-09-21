@@ -14,18 +14,6 @@ import akka.remote.testkit.MultiNodeSpec
 import akka.testkit.ImplicitSender
 
 
-object MultiNodeSampleConfig extends MultiNodeConfig {
-
-  val node1 = role("node1")
-
-  val node2 = role("node2")
-
-}
-
-class MultiNodeTestMultiJvmNode1 extends MultiNodeSample
-
-class MultiNodeTestMultiJvmNode2 extends MultiNodeSample
-
 object MultiNodeSample {
   
   class ClientActor(val dataProvider: ProviderInterface) extends Actor with ClientInterface {
@@ -77,15 +65,6 @@ object MultiNodeSample {
 }
 
 
-trait STMultiNodeSpec extends MultiNodeSpecCallbacks with WordSpecLike with Matchers with BeforeAndAfterAll {
-
-  override def beforeAll() = multiNodeSpecBeforeAll()
-
-  override def afterAll() = multiNodeSpecAfterAll()
-
-}
-
-
 class MultiNodeSample extends MultiNodeSpec(MultiNodeSampleConfig) with STMultiNodeSpec with ImplicitSender {
 
   import MultiNodeSampleConfig._
@@ -125,3 +104,25 @@ class MultiNodeSample extends MultiNodeSpec(MultiNodeSampleConfig) with STMultiN
 
   }
 }
+
+
+object MultiNodeSampleConfig extends MultiNodeConfig {
+
+  val node1 = role("node1")
+
+  val node2 = role("node2")
+
+}
+
+class MultiNodeTestMultiJvmNode1 extends MultiNodeSample
+
+class MultiNodeTestMultiJvmNode2 extends MultiNodeSample
+
+trait STMultiNodeSpec extends MultiNodeSpecCallbacks with WordSpecLike with Matchers with BeforeAndAfterAll {
+
+  override def beforeAll() = multiNodeSpecBeforeAll()
+
+  override def afterAll() = multiNodeSpecAfterAll()
+
+}
+
