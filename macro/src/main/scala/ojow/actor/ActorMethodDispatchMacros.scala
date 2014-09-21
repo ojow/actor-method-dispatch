@@ -104,8 +104,8 @@ object ActorMethodDispatchMacros {
     val (tellMethods, askReplyMethods) = selectMethods(c)(tpe.members)
 
     def method2override(m: c.universe.MethodSymbol, body: (Tree, Tree) => Tree): Tree = {
-      val (params, implicitParams) = paramLists(c)(m)
-      val paramsDef = params.map(_.map(sym => q"${sym.name.toTermName}: ${sym.typeSignature}"))
+      val (paramss, implicitParams) = paramLists(c)(m)
+      val paramsDef = paramss.map(_.map(sym => q"${sym.name.toTermName}: ${sym.typeSignature}"))
       val implicitParamsDef = implicitParams.map(sym => q"${sym.name.toTermName}: ${sym.typeSignature}")
       val argValues = q"List(..${m.paramLists.map(xs => q"List(..${xs.map(sym => q"${sym.name.toTermName}")})")})"
       val name = Literal(Constant(m.name.decodedName.toString))
