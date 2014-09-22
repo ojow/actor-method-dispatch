@@ -1,6 +1,6 @@
 ### actor-method-dispatch
 
-An attempt to add some type safety to Akka Actors.
+The project introduces a type-safe layer on top of the current Akka Actor API.
 
 ### Features
 
