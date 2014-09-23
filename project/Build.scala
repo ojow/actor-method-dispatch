@@ -9,7 +9,7 @@ object ActorMethodDispatchBuild extends Build {
 
    lazy val main = Project("main", file("."), settings = SbtMultiJvm.multiJvmSettings ++ Seq(
      scalaVersion in Global := "2.11.2",
-     organization in Global := "akka",
+     organization in Global := "net.ogalako",
      version in Global := "0.2-SNAPSHOT",
      name := "actor-method-dispatch",
      libraryDependencies ++= Seq(
@@ -35,7 +35,9 @@ object ActorMethodDispatchBuild extends Build {
      mappings in (Compile, packageBin) ++= mappings.in(macroSub, Compile, packageBin).value,
      mappings in (Compile, packageSrc) ++= mappings.in(macroSub, Compile, packageSrc).value,
      mappings in (Compile, packageBin) ++= mappings.in(commonSub, Compile, packageBin).value,
-     mappings in (Compile, packageSrc) ++= mappings.in(commonSub, Compile, packageSrc).value
+     mappings in (Compile, packageSrc) ++= mappings.in(commonSub, Compile, packageSrc).value,
+
+     publishMavenStyle := true
    )) dependsOn(macroSub, commonSub) aggregate(macroSub, commonSub) configs (MultiJvm)
 
    lazy val commonSub = Project("common", file("common")) settings(
