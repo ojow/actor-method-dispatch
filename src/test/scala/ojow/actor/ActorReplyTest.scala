@@ -23,7 +23,8 @@ class ActorReplyTest extends FunSuite with ScalaFutures {
 }
 
 
-class DataAggregatorActor(val providers: List[DataProviderInterface]) extends Actor with DataAggregatorInterface {
+class DataAggregatorActor(val providers: List[DataProviderInterface]) extends
+                  SelfMethodsActor(selfMethods[DataAggregatorInterface]) with DataAggregatorInterface {
 
   var replyAddress: Option[ReplyAddress[String]] = None
 
@@ -31,16 +32,11 @@ class DataAggregatorActor(val providers: List[DataProviderInterface]) extends Ac
 
   var stringData = Map[Int, String]()
 
-  override protected def thisActor = this
-
-  override def receive = selfMethods[DataAggregatorInterface]
-
   def checkData(): Unit = {
     if (intData.size == providers.size && stringData.size == providers.size) {
       replyAddress.map(_.sendReply(s"Data collected: ${intData.size}, ${stringData.size}"))
     }
   }
-
 }
 
 trait DataAggregatorInterface extends ActorMethodsOf[DataAggregatorActor] {

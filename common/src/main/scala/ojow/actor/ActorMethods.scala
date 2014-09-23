@@ -13,9 +13,25 @@ trait ActorMethods {
 
 }
 
+
 trait ActorMethodsOf[T <: Actor] extends ActorMethods {
 
   override type ActorState = T
+
+}
+
+
+class MethodsActor(initialReceive: Actor.Receive) extends Actor {
+
+  override def receive: Receive = initialReceive
+
+}
+
+
+class SelfMethodsActor(initialReceive: Actor.Receive) extends MethodsActor(initialReceive) {
+  this: ActorMethods =>
+
+  override protected def thisActor = this
 
 }
 
