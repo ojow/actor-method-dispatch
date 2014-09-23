@@ -132,7 +132,7 @@ object ActorMethodDispatchMacros {
     c.Expr[T] {q"""
       new ojow.actor.ActorRefWithMethods($ref) with $tpe {
         private def proxyError = throw new RuntimeException("This method must not be called on a proxy.")
-        override protected def thisActor = proxyError
+        override protected def actor = proxyError
         override protected def self = $ref
         ..${tellOverrides ++ askReplyOverrides}
       }

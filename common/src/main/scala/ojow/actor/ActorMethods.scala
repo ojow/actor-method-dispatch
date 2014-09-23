@@ -7,7 +7,7 @@ trait ActorMethods {
   
   type ActorState <: Actor
 
-  protected def thisActor: ActorState
+  protected def actor: ActorState
 
   protected implicit def self: ActorRef
 
@@ -31,7 +31,7 @@ class MethodsActor(initialReceive: Actor.Receive) extends Actor {
 class SelfMethodsActor(initialReceive: Actor.Receive) extends MethodsActor(initialReceive) {
   this: ActorMethods =>
 
-  override protected def thisActor = this
+  override protected def actor = this
 
 }
 

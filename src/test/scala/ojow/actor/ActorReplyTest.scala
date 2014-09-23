@@ -42,34 +42,28 @@ class DataAggregatorActor(val providers: List[DataProviderInterface]) extends
 trait DataAggregatorInterface extends ActorMethodsOf[DataAggregatorActor] {
   
   def askCollectData(implicit replyAddress: ReplyAddress[String]): Reply[String] = {
-    for ((provider, id) <- thisActor.providers.zipWithIndex) {
+    for ((provider, id) <- actor.providers.zipWithIndex) {
       provider.askIntData.handleWith(replyHandler(tellIntDataReply(id)))
       provider.askStringData.handleWith(replyHandler(tellStringDataReply(id)))
     }
-    thisActor.replyAddress = Some(replyAddress)
+    actor.replyAddress = Some(replyAddress)
     WillReplyLater
   }
 
   def tellIntDataReply(providerId: Int)(intData: Int): Unit = {
-    thisActor.intData = thisActor.intData.updated(providerId, intData)
-    thisActor.checkData()
+    actor.intData = actor.intData.updated(providerId, intData)
+    actor.checkData()
   }
 
   def tellStringDataReply(providerId: Int)(stringData: String): Unit = {
-    thisActor.stringData = thisActor.stringData.updated(providerId, stringData)
-    thisActor.checkData()
+    actor.stringData = actor.stringData.updated(providerId, stringData)
+    actor.checkData()
   }
 
 }
 
 
-class DataProviderActor extends Actor with DataProviderInterface {
-
-  override protected def thisActor = this
-
-  override def receive = selfMethods[DataProviderInterface]
-
-}
+class DataProviderActor extends SelfMethodsActor(selfMethods[DataProviderInterface]) with DataProviderInterface
 
 trait DataProviderInterface extends ActorMethodsOf[DataProviderActor] {
 

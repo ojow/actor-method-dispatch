@@ -13,8 +13,8 @@ The project introduces a type-safe layer on top of the current Akka Actor API.
 #### Methods:
 ```scala
 trait ActorInterface extends ActorMethodsOf[SimpleActor] { // where class SimpleActor extends Actor
-  def tellIncrement(): Unit = { thisActor.i += 1 }
-  def askCurrentValue = Reply(thisActor.i)
+  def tellIncrement(): Unit = { actor.i += 1 }
+  def askCurrentValue = Reply(actor.i)
 }
 ```
 
@@ -27,7 +27,7 @@ override def receive = selfMethods[ActorInterface] orElse {
 
 // swappableMethods returns a Receive that routes messages to its own copy of ActorMethods
 def behavior(step: Int): Receive = swappableMethods(new LinkedTo(this) with ActorInterface {
-  override def tellIncrement(): Unit = { thisActor.i += step }
+  override def tellIncrement(): Unit = { actor.i += step }
 })
 ```
 
@@ -46,7 +46,7 @@ var replyAddress: Option[ReplyAddress[String]] = None
 
 def askCollectData(implicit replyAddress: ReplyAddress[String]): Reply[String] = {
   // save reply address for later use
-  thisActor.replyAddress = Some(replyAddress)
+  actor.replyAddress = Some(replyAddress)
 
   // Send a message along with meta info on how to handle the reply
   provider.askIntData.handleWith(replyHandler(tellIntDataReply(someContext)))
@@ -57,7 +57,7 @@ def askCollectData(implicit replyAddress: ReplyAddress[String]): Reply[String] =
 // Here we handle replies from provider.askIntData
 def tellIntDataReply(context: SomeContext)(intData: Int): Unit = {
   // Replying to the saved address when we are ready
-  thisActor.replyAddress.map(_.sendReply(s"Data collected: $intData"))
+  actor.replyAddress.map(_.sendReply(s"Data collected: $intData"))
 }
 
 // Using from outside is the same:

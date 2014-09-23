@@ -18,7 +18,7 @@ object MultiNodeSample {
   
   class ClientActor(val dataProvider: ProviderInterface) extends Actor with ClientInterface {
 
-    override protected def thisActor = this
+    override protected def actor = this
 
     override def receive = selfMethods[ClientInterface]
 
@@ -28,10 +28,10 @@ object MultiNodeSample {
 
     override type ActorState = ClientActor
 
-    def tellSetData(data: String): Unit = { thisActor.dataProvider.tellSetData(data) }
+    def tellSetData(data: String): Unit = { actor.dataProvider.tellSetData(data) }
 
     def askData(implicit replyTo: ReplyAddress[String]): Reply[String] = {
-      thisActor.dataProvider.askData("a string from client").handleWith(replyHandler(tellAcceptDataFromProvider(replyTo)))
+      actor.dataProvider.askData("a string from client").handleWith(replyHandler(tellAcceptDataFromProvider(replyTo)))
       WillReplyLater
     }
 
@@ -46,7 +46,7 @@ object MultiNodeSample {
     
     var data: String = ""
 
-    override protected def thisActor = this
+    override protected def actor = this
 
     override def receive = selfMethods[ProviderInterface]
 
@@ -56,9 +56,9 @@ object MultiNodeSample {
 
     override type ActorState = ProviderActor
     
-    def tellSetData(data: String): Unit = { thisActor.data = data }
+    def tellSetData(data: String): Unit = { actor.data = data }
 
-    def askData(param: String) = Reply(s"data with param = $param: ${thisActor.data}")
+    def askData(param: String) = Reply(s"data with param = $param: ${actor.data}")
     
   }
 

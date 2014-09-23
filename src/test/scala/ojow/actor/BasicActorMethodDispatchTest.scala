@@ -55,7 +55,7 @@ class SimpleActor extends Actor with SimpleActorInterface {
   var i: Int = 0
 
   // give SimpleActorInterface's methods access to the Actor object
-  override protected def thisActor = this
+  override protected def actor = this
 
   // selfMethods returns a Receive that routes messages to this Actor method calls
   override def receive = selfMethods[SimpleActorInterface] orElse {
@@ -63,9 +63,9 @@ class SimpleActor extends Actor with SimpleActorInterface {
   }
 
   // swappableMethods returns Receive that routes messages to its own instance of ActorMethods
-  // LinkedTo(this) is here just to reduce boilerplate so you don't have to override 'thisActor' manually
+  // LinkedTo(this) is here just to reduce boilerplate so you don't have to override 'actor' manually
   def modifiedBehavior(step: Int): Receive = swappableMethods(new LinkedTo(this) with SimpleActorInterface {
-    override def tellIncrement(): Unit = { thisActor.i += step }
+    override def tellIncrement(): Unit = { actor.i += step }
   })
 
 }
@@ -74,14 +74,14 @@ class SimpleActor extends Actor with SimpleActorInterface {
 // Only allowed public methods are a) starting with 'tell' and returning a Reply, b) starting with 'ask' and returning Unit
 trait SimpleActorInterface extends ActorMethodsOf[SimpleActor] {
 
-  def tellIncrement(): Unit = { thisActor.i += 1 }
+  def tellIncrement(): Unit = { actor.i += 1 }
 
-  def askCurrentValue = Reply(thisActor.i)
+  def askCurrentValue = Reply(actor.i)
 
   def askException: Reply[Int] = throw new IllegalStateException("It is happening again.")
 
   def tellBecomeModified(): Unit = {
-    thisActor.context.become(thisActor.modifiedBehavior(2))
+    actor.context.become(actor.modifiedBehavior(2))
   }
 
 }
