@@ -13,6 +13,12 @@ trait ActorMethods {
 
 }
 
+trait ActorMethodsOf[T <: Actor] extends ActorMethods {
+
+  override type ActorState = T
+
+}
+
 
 abstract class ActorRefWithMethods(val actorRef: ActorRef) extends ActorMethods with Serializable
 

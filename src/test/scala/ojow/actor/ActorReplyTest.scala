@@ -43,9 +43,7 @@ class DataAggregatorActor(val providers: List[DataProviderInterface]) extends Ac
 
 }
 
-trait DataAggregatorInterface extends ActorMethods {
-  
-  override type ActorState = DataAggregatorActor
+trait DataAggregatorInterface extends ActorMethodsOf[DataAggregatorActor] {
   
   def askCollectData(implicit replyAddress: ReplyAddress[String]): Reply[String] = {
     for ((provider, id) <- thisActor.providers.zipWithIndex) {
@@ -77,9 +75,7 @@ class DataProviderActor extends Actor with DataProviderInterface {
 
 }
 
-trait DataProviderInterface extends ActorMethods {
-
-  override type ActorState = DataProviderActor
+trait DataProviderInterface extends ActorMethodsOf[DataProviderActor] {
 
   def askIntData = Reply(42)
 

@@ -72,10 +72,7 @@ class SimpleActor extends Actor with SimpleActorInterface {
 
 
 // Only allowed public methods are a) starting with 'tell' and returning a Reply, b) starting with 'ask' and returning Unit
-trait SimpleActorInterface extends ActorMethods {
-
-  // this one is needed to get access to the host actor internals via method 'thisActor'
-  override type ActorState = SimpleActor
+trait SimpleActorInterface extends ActorMethodsOf[SimpleActor] {
 
   def tellIncrement(): Unit = { thisActor.i += 1 }
 

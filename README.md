@@ -12,8 +12,7 @@ The project introduces a type-safe layer on top of the current Akka Actor API.
 
 #### Methods:
 ```scala
-trait ActorInterface extends ActorMethods {
-  override type ActorState = SimpleActor // class SimpleActor extends Actor
+trait ActorInterface extends ActorMethodsOf[SimpleActor] { // where class SimpleActor extends Actor
   def tellIncrement(): Unit = { thisActor.i += 1 }
   def askCurrentValue = Reply(thisActor.i)
 }
