@@ -27,14 +27,13 @@ object ActorMethodDispatchMacros {
    *       case ActorMethodCall("tellDoSomething", args, rawReplyAddr, rawExceptionHandler) => tellDoSomething()
    *     }
    */
-  def selfMethods[T <: ActorMethods](implicit ec: ExecutionContext): Actor.Receive = macro selfMethodsImpl[T]
+  def selfMethods[T <: ActorMethods]: Actor.Receive = macro selfMethodsImpl[T]
 
-  def selfMethodsImpl[T <: ActorMethods : c.WeakTypeTag](c: blackbox.Context)(
-                                                              ec: c.Expr[ExecutionContext]): c.Expr[Actor.Receive] = {
+  def selfMethodsImpl[T <: ActorMethods : c.WeakTypeTag](c: blackbox.Context): c.Expr[Actor.Receive] = {
     import c.universe._
     val tpe = weakTypeOf[T]
 
-    c.Expr[Actor.Receive](methodsToCases(c)(tpe, q"this", ec))
+    c.Expr[Actor.Receive](methodsToCases(c)(tpe, q"this"))
   }
 
 
@@ -51,18 +50,17 @@ object ActorMethodDispatchMacros {
    *     override def apply(v1: Any) = recv.apply(v1)
    *   }
    */
-  def swappableMethods[T <: ActorMethods](obj: => T)(implicit ec: ExecutionContext): Actor.Receive =
+  def swappableMethods[T <: ActorMethods](obj: => T): Actor.Receive =
     macro swappableMethodsImpl[T]
 
-  def swappableMethodsImpl[T <: ActorMethods : c.WeakTypeTag](c: blackbox.Context)(obj: c.Tree)(
-                                                              ec: c.Expr[ExecutionContext]): c.Expr[Actor.Receive] = {
+  def swappableMethodsImpl[T <: ActorMethods : c.WeakTypeTag](c: blackbox.Context)(obj: c.Tree): c.Expr[Actor.Receive] = {
     import c.universe._
     val tpe = weakTypeOf[T]
 
     c.Expr[Actor.Receive](q"""
       new PartialFunction[Any, Unit] {
         val methodsObj = $obj
-        val recv: _root_.akka.actor.Actor.Receive = ${methodsToCases(c)(tpe, q"methodsObj", ec)}
+        val recv: _root_.akka.actor.Actor.Receive = ${methodsToCases(c)(tpe, q"methodsObj")}
         override def isDefinedAt(x: Any) = recv.isDefinedAt(x)
         override def apply(v1: Any) = recv.apply(v1)
       }
@@ -218,8 +216,7 @@ object ActorMethodDispatchMacros {
    * Converts suitable for message dispatching methods of type 'tpe' to a set of { case ... => ... } clauses
    * which is a Receive that matches ActorMethodCall messages and calls corresponding methods
    */
-  private def methodsToCases(c: blackbox.Context)(tpe: c.universe.Type, selector: c.Tree,
-                                                 ec: c.Expr[ExecutionContext]): c.universe.Tree = {
+  private def methodsToCases(c: blackbox.Context)(tpe: c.universe.Type, selector: c.Tree): c.universe.Tree = {
     import c.universe._
     val (tellMethods, askReplyMethods) = selectMethods(c)(tpe.members)
 
