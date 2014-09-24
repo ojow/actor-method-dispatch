@@ -15,7 +15,6 @@ object ActorMethodDispatch extends Build {
      version in Global := "0.2-SNAPSHOT",
      name := "actor-method-dispatch",
      licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.html")),
-     homepage := Some(url("https://github.com/ojow/actor-method-dispatch")),
      profileName := "ojow",
      libraryDependencies ++= Seq(
        "com.typesafe.akka" %% "akka-remote" % akkaVersion % "test",
@@ -43,14 +42,10 @@ object ActorMethodDispatch extends Build {
      mappings in (Compile, packageSrc) ++= mappings.in(commonSub, Compile, packageSrc).value,
 
      publishMavenStyle := true,
+     publishArtifact in Test := false,
+     pomIncludeRepository := { _ => false },
      pomExtra := {
        <url>https://github.com/ojow/actor-method-dispatch</url>
-         <licenses>
-           <license>
-             <name>Apache 2</name>
-             <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
-           </license>
-         </licenses>
          <scm>
            <connection>scm:git:github.com/ojow/actor-method-dispatch.git</connection>
            <developerConnection>scm:git:git@github.com:ojow/actor-method-dispatch.git</developerConnection>
