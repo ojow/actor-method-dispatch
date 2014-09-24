@@ -4,6 +4,8 @@ The project introduces a type-safe layer on top of the current Akka Actor API.
 
 ### Usage
 ```scala
+scalaVersion := "2.11.2"
+
 libraryDependencies ++= Seq(
   "net.ogalako" %% "actor-method-dispatch" % "0.2"
 )
