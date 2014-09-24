@@ -62,7 +62,7 @@ object ActorMethodDispatchMacros {
     c.Expr[Actor.Receive](q"""
       new PartialFunction[Any, Unit] {
         val methodsObj = $obj
-        val recv: Receive = ${methodsToCases(c)(tpe, q"methodsObj", ec)}
+        val recv: _root_.akka.actor.Actor.Receive = ${methodsToCases(c)(tpe, q"methodsObj", ec)}
         override def isDefinedAt(x: Any) = recv.isDefinedAt(x)
         override def apply(v1: Any) = recv.apply(v1)
       }
@@ -114,24 +114,24 @@ object ActorMethodDispatchMacros {
     }
 
     val tellOverrides = tellMethods.map(m => method2override(m, (name, argValues) =>
-      q"actorRef ! ojow.actor.AmcReplyToSender($name, $argValues)"))
+      q"actorRef ! _root_.ojow.actor.AmcReplyToSender($name, $argValues)"))
 
     val askReplyOverrides = askReplyMethods.map(m => method2override(m, (name, argValues) => {
       val typeArgs = m.returnType.typeArgs.map(x => tq"$x")
       q""" new ${m.returnType} {
          override def value = proxyError
-         override def handleWith(addr: ojow.actor.ReplyAddress[..$typeArgs],
-           exceptionHandler: ReplyAddress[Status.Status] = ReplyAddress.replyToSender(None)): Unit = {
-             actorRef ! ojow.actor.AmcWithReplyAddress($name, $argValues, addr, exceptionHandler)
+         override def handleWith(addr: _root_.ojow.actor.ReplyAddress[..$typeArgs],
+           exceptionHandler: _root_.ojow.actor.ReplyAddress[Status.Status] = _root_.ojow.actor.ReplyAddress.replyToSender(None)): Unit = {
+             actorRef ! _root_.ojow.actor.AmcWithReplyAddress($name, $argValues, addr, exceptionHandler)
          }
-         override def toFuture: scala.concurrent.Future[..$typeArgs] =
-           akka.pattern.ask(actorRef, ojow.actor.AmcReplyToSender($name, $argValues))($askTimeout).
-             asInstanceOf[scala.concurrent.Future[..$typeArgs]]
+         override def toFuture: _root_.scala.concurrent.Future[..$typeArgs] =
+           _root_.akka.pattern.ask(actorRef, _root_.ojow.actor.AmcReplyToSender($name, $argValues))($askTimeout).
+             asInstanceOf[_root_.scala.concurrent.Future[..$typeArgs]]
       } """}))
 
     c.Expr[T] {q"""
-      new ojow.actor.ActorRefWithMethods($ref) with $tpe {
-        private def proxyError = throw new RuntimeException("This method must not be called on a proxy.")
+      new _root_.ojow.actor.ActorRefWithMethods($ref) with $tpe {
+        private def proxyError = throw new _root_.java.lang.RuntimeException("This method must not be called on a proxy.")
         override protected def actor = proxyError
         override protected def self = $ref
         ..${tellOverrides ++ askReplyOverrides}
@@ -159,7 +159,9 @@ object ActorMethodDispatchMacros {
     f.tree match {
       case q"{((${q"$mods val $tname: $tpt = $expr"}) => $selector.${mname: TermName}(...$args)(${lastArg: TermName}))}" if tname == lastArg =>
         val name = Literal(Constant(mname.decodedName.toString))
-        c.Expr[ReplyAddress[T]](q"""new ojow.actor.ReplyAddress[$tpe](Some($selector.self), Some(new CurriedActorMethodCall[$tpe]($name, $args)))""")
+        c.Expr[ReplyAddress[T]](
+          q"""new _root_.ojow.actor.ReplyAddress[$tpe](Some($selector.self),
+             Some(new _root_.ojow.actor.CurriedActorMethodCall[$tpe]($name, $args)))""")
 
       case _ => reportError(c, "replyHandler argument must look like a method call without last argument list.")
     }
@@ -245,7 +247,7 @@ object ActorMethodDispatchMacros {
 
       val methodNamePattern = pq"${m.name.decodedName.toString}"
       val handler = methodCallHandler(impls => q"$selector.${m.name}(...${impls.map(i => methodParams :+ List(i)).getOrElse(methodParams)})", implicitParams)
-      cq"""ojow.actor.ActorMethodCall($methodNamePattern, args, rawReplyAddr, rawExceptionHandler) => $handler"""
+      cq"""_root_.ojow.actor.ActorMethodCall($methodNamePattern, args, rawReplyAddr, rawExceptionHandler) => $handler"""
     }
 
     val tellCases = tellMethods.map(methodToCase(_, (call, _) => call(None)))
@@ -254,17 +256,17 @@ object ActorMethodDispatchMacros {
       val replyAddress =  if (implParams.nonEmpty) Some(q"replyAddr") else None // TODO: correct check
 
       q"""
-        val replyAddr = rawReplyAddr.asInstanceOf[ReplyAddress[Any]].fillRef(sender())
-        val exceptionHandler = rawExceptionHandler.asInstanceOf[ReplyAddress[Any]].fillRef(sender())
+        val replyAddr = rawReplyAddr.asInstanceOf[_root_.ojow.actor.ReplyAddress[Any]].fillRef(sender())
+        val exceptionHandler = rawExceptionHandler.asInstanceOf[_root_.ojow.actor.ReplyAddress[Any]].fillRef(sender())
         try {
           val result = ${call(replyAddress)}
-          if (result != WillReplyLater) {
+          if (result != _root_.ojow.actor.WillReplyLater) {
             replyAddr.sendReply(result.value)
           }
         }
         catch {
-          case e: Exception =>
-            exceptionHandler.sendReply(akka.actor.Status.Failure(e))
+          case e: _root_.java.lang.Exception =>
+            exceptionHandler.sendReply(_root_.akka.actor.Status.Failure(e))
             throw e
         }
       """}))
