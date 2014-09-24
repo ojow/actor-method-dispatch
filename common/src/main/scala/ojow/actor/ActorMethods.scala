@@ -21,21 +21,6 @@ trait ActorMethodsOf[T <: Actor] extends ActorMethods {
 }
 
 
-class MethodsActor(initialReceive: Actor.Receive) extends Actor {
-
-  override def receive: Receive = initialReceive
-
-}
-
-
-class SelfMethodsActor(initialReceive: Actor.Receive) extends MethodsActor(initialReceive) {
-  this: ActorMethods =>
-
-  override protected def actor = this
-
-}
-
-
 abstract class ActorRefWithMethods(val actorRef: ActorRef) extends ActorMethods with Serializable
 
 
