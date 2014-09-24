@@ -168,20 +168,6 @@ object ActorMethodDispatchMacros {
   }
 
 
-  def noVarsActor[T <: ActorMethods](initialBehavior: => T): T = macro noVarsActorImpl[T]
-
-  def noVarsActorImpl[T <: ActorMethods : c.WeakTypeTag](c: blackbox.Context)(initialBehavior: c.Tree): c.Expr[T] = {
-    import c.universe._
-    val tpe = weakTypeOf[T]
-
-
-    c.Expr[T]{
-      q"""
-
-       """}
-  }
-
-
   private def reportError(c: blackbox.Context, msg: String): Nothing = c.abort(c.enclosingPosition, msg)
 
   /**
