@@ -10,58 +10,58 @@ The project introduces a type-safe layer on top of the current Akka Actor API.
   - You still have control over all Actor features: raw messages, become, supervision etc.
   - No JDK proxies, no bytecode hacks, pure Scala macros.
 
-#### Counter actor with a 'var':
+#### Counter actor with a `var`:
 ```scala
-  class CounterActor extends Actor {
-    var i: Int = 0
-    override def receive = swappableMethods(new LinkedTo(this) with CounterActorInterface)
+class CounterActor extends Actor {
+  var i: Int = 0
+  override def receive = swappableMethods(new LinkedTo(this) with CounterActorInterface)
+}
+
+trait CounterActorInterface extends ActorMethodsOf[CounterActor] {
+  def askIncrementAndGet(): Reply[Int] = {
+    actor.i += 1
+    Reply(actor.i)
   }
 
-  trait CounterActorInterface extends ActorMethodsOf[CounterActor] {
-    def askIncrementAndGet(): Reply[Int] = {
-      actor.i += 1
-      Reply(actor.i)
-    }
-
-    def tellReset(): Unit = {
-      actor.i = 0
-    }
+  def tellReset(): Unit = {
+    actor.i = 0
   }
+}
 ```
 
-#### Counter actor wihout 'var's, using become:
+#### Counter actor wihout `var`s, using `become`:
 ```scala
-  class CounterActor extends Actor {
-    override def receive = behavior(0)
+class CounterActor extends Actor {
+  override def receive = behavior(0)
 
-    def behavior(i: Int): Receive = swappableMethods(new LinkedTo(this) with CounterActorInterface {
-      def askIncrementAndGet(): Reply[Int] = {
-        context.become(behavior(i + 1))
-        Reply(i + 1)
-      }
-    })
+  def behavior(i: Int): Receive = swappableMethods(new LinkedTo(this) with CounterActorInterface {
+    def askIncrementAndGet(): Reply[Int] = {
+      context.become(behavior(i + 1))
+      Reply(i + 1)
+    }
+  })
 
-  }
+}
 
-  trait CounterActorInterface extends ActorMethodsOf[CounterActor] {
-    def askIncrementAndGet(): Reply[Int]
-    def tellReset(): Unit = actor.context.become(actor.behavior(0))
-  }
+trait CounterActorInterface extends ActorMethodsOf[CounterActor] {
+  def askIncrementAndGet(): Reply[Int]
+  def tellReset(): Unit = actor.context.become(actor.behavior(0))
+}
 ```
 
 #### Calling methods/sending messages:
 ```scala
-    // Create a proxy which is then used to send messages via method calls
-    val myActor = actorMethodsProxy[CounterActorInterface](sys.actorOf(Props[CounterActor]))
+// Create a proxy which is then used to send messages via method calls
+val myActor = actorMethodsProxy[CounterActorInterface](sys.actorOf(Props[CounterActor]))
 
-    // Calling a 'tell' method, return type Unit
-    myActor.tellReset()
+// Calling a 'tell' method, return type Unit
+myActor.tellReset()
 
-    // Calling an 'ask' method, returns a Reply which can be converted to a Future
-    val result: Future[Int] = myActor.askIncrementAndGet().toFuture
+// Calling an 'ask' method, returns a Reply which can be converted to a Future
+val result: Future[Int] = myActor.askIncrementAndGet().toFuture
 
-    // The reply message will not be sent at all
-    myActor.askIncrementAndGet().ignoreReply()
+// The reply message will not be sent at all
+myActor.askIncrementAndGet().ignoreReply()
 ```
 
 #### Handling replies with an Actor:
