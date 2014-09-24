@@ -1,6 +1,13 @@
-### actor-method-dispatch
+## actor-method-dispatch
 
 The project introduces a type-safe layer on top of the current Akka Actor API.
+
+### Usage
+```scala
+libraryDependencies ++= Seq(
+  "net.ogalako" %% "actor-method-dispatch" % "0.2"
+)
+```
 
 ### Features
 
@@ -10,7 +17,7 @@ The project introduces a type-safe layer on top of the current Akka Actor API.
   - You still have control over all Actor features: raw messages, become, supervision etc.
   - No JDK proxies, no bytecode hacks, pure Scala macros.
 
-#### Counter actor with a `var`:
+### Counter actor with a `var`:
 ```scala
 class CounterActor extends Actor {
   var i: Int = 0
@@ -29,7 +36,7 @@ trait CounterActorInterface extends ActorMethodsOf[CounterActor] {
 }
 ```
 
-#### Counter actor wihout `var`s, using `become`:
+### Counter actor wihout `var`s, using `become`:
 ```scala
 class CounterActor extends Actor {
   override def receive = behavior(0)
@@ -49,7 +56,7 @@ trait CounterActorInterface extends ActorMethodsOf[CounterActor] {
 }
 ```
 
-#### Calling methods/sending messages:
+### Calling methods/sending messages:
 ```scala
 // Create a proxy which is then used to send messages via method calls
 val myActor = actorMethodsProxy[CounterActorInterface](sys.actorOf(Props[CounterActor]))
@@ -64,7 +71,7 @@ val result: Future[Int] = myActor.askIncrementAndGet().toFuture
 myActor.askIncrementAndGet().ignoreReply()
 ```
 
-#### Handling replies with an Actor:
+### Handling replies with an Actor:
 ```scala
 // State inside the Actor:
 var replyAddress: Option[ReplyAddress[String]] = None
@@ -94,7 +101,7 @@ actor.askCollectData.handleWith(replyHandler(anotherActor.tellAcceptStringData))
 
 See [tests](https://github.com/ojow/actor-method-dispatch/blob/master/src/test/scala/ojow/actor) for more examples.
 
-#### How it works
+### How it works
 There are 3 kind of macros:
   1. For creating proxies. They just override methods on your trait with code to send `ActorMethodCall` messages.
   2. For creating `Receive`s. They build a `Receive` from a list of `case` clauses to match `ActorMethodCall` messages and call respective methods.
