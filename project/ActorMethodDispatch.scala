@@ -1,3 +1,4 @@
+import com.typesafe.sbt.pgp.PgpKeys
 import sbt._
 import Keys._
 import xerial.sbt.Sonatype._
@@ -9,10 +10,11 @@ import com.typesafe.sbt.SbtMultiJvm.MultiJvmKeys.MultiJvm
 object ActorMethodDispatch extends Build {
    val akkaVersion = "2.3.6"
 
-   lazy val main = Project("main", file("."), settings = SbtMultiJvm.multiJvmSettings ++ sonatypeSettings ++ Seq(
+   lazy val main = Project("main", file(".")).dependsOn(macroSub, commonSub).settings(SbtMultiJvm.multiJvmSettings: _*).
+                                              settings(sonatypeSettings: _*).settings(
      scalaVersion in Global := "2.11.2",
      organization in Global := "net.ogalako",
-     version in Global := "0.2-SNAPSHOT",
+     version in Global := "0.2",
      name := "actor-method-dispatch",
      licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.html")),
      profileName := "ojow",
@@ -41,9 +43,7 @@ object ActorMethodDispatch extends Build {
      mappings in (Compile, packageBin) ++= mappings.in(commonSub, Compile, packageBin).value,
      mappings in (Compile, packageSrc) ++= mappings.in(commonSub, Compile, packageSrc).value,
 
-     publishMavenStyle := true,
      publishArtifact in Test := false,
-     pomIncludeRepository := { _ => false },
      pomExtra := {
        <url>https://github.com/ojow/actor-method-dispatch</url>
          <scm>
@@ -58,16 +58,34 @@ object ActorMethodDispatch extends Build {
              <url>https://github.com/ojow</url>
            </developer>
          </developers>
+     },
+     pomPostProcess := { xi: scala.xml.Node =>
+       import scala.xml._
+
+       val badDeps = (xi \\ "dependency").filter(x => (x \ "groupId").text == "net.ogalako").toSet
+
+       def filt(root: Node): Node = root match {
+         case x: Elem =>
+           val ch = x.child.filter(!badDeps(_)).map(filt)
+           Elem(x.prefix, x.label, x.attributes, x.scope, false, ch: _*)
+
+         case x => x
+       }
+       filt(xi)
      }
-   )) dependsOn(macroSub, commonSub) aggregate(macroSub, commonSub) configs (MultiJvm)
+   ).aggregate(macroSub, commonSub).configs(MultiJvm)
 
    lazy val commonSub = Project("common", file("common")) settings(
+     publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo"))),
+     publishArtifact := false,
      libraryDependencies ++= Seq(
        "com.typesafe.akka" %% "akka-actor" % akkaVersion
      )
    )
 
    lazy val macroSub = Project("macro", file("macro")) dependsOn(commonSub) settings(
-      libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value
+     publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo"))),
+     publishArtifact := false,
+     libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value
    )
 }
