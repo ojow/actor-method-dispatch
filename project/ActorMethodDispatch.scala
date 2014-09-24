@@ -14,7 +14,7 @@ object ActorMethodDispatch extends Build {
                                               settings(sonatypeSettings: _*).settings(
      scalaVersion in Global := "2.11.2",
      organization in Global := "net.ogalako",
-     version in Global := "0.2",
+     version in Global := "0.3-SNAPSHOT",
      name := "actor-method-dispatch",
      licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.html")),
      profileName := "ojow",
