@@ -14,3 +14,10 @@ class LinkedTo[T <: Actor](a: T) extends ActorMethods {
 }
 
 
+trait ActorWithMethods[T <: Actor] extends Actor with ActorMethods {
+  this: T =>
+
+  override type ActorState = T
+
+  override protected def actor = this
+}

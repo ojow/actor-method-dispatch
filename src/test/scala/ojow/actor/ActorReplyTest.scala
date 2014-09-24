@@ -66,9 +66,7 @@ trait DataAggregatorInterface extends ActorMethodsOf[DataAggregatorActor] {
 }
 
 
-class DataProviderActor extends Actor with DataProviderInterface {
-
-  override def actor = this
+class DataProviderActor extends ActorWithMethods[DataProviderActor] with DataProviderInterface {
 
   override def receive = selfMethods[DataProviderInterface]
 
