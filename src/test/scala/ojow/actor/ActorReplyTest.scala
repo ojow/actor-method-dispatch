@@ -23,15 +23,14 @@ class ActorReplyTest extends FunSuite with ScalaFutures {
 }
 
 
-class DataAggregatorActor(val providers: List[DataProviderInterface]) extends Actor with DataAggregatorInterface {
+class DataAggregatorActor(val providers: List[DataProviderInterface]) extends
+                    ActorWithMethods[DataAggregatorActor] with DataAggregatorInterface {
 
   var replyAddress: Option[ReplyAddress[String]] = None
 
   var intData = Map[Int, Int]()
 
   var stringData = Map[Int, String]()
-
-  override def actor = this
 
   override def receive = selfMethods[DataAggregatorInterface]
 
