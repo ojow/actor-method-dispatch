@@ -70,6 +70,24 @@ object ActorMethodDispatchMacros {
 
 
   /**
+   * Returns message that is used to call the given method
+   */
+  def msgFor(method: => Any): AmcReplyToSender = macro msgForImpl
+
+  def msgForImpl(c: blackbox.Context)(method: c.Tree): c.Expr[AmcReplyToSender] = {
+    import c.universe._
+
+    method match {
+      case q"$selector.$name(...$params)" =>
+        val args = q"List(..${params.map(xs => q"List(..$xs)")})"
+        val nameLiteral = Literal(Constant(name.decodedName.toString))
+        c.Expr[AmcReplyToSender](q"_root_.ojow.actor.AmcReplyToSender($nameLiteral, $args)")
+
+      case _ => reportError(c, "msgFor's argument must be a method call.")
+    }
+  }
+
+  /**
    * Returns an anonymous class instantion expression. The class is the given 'T' with methods (suitable for message
    * dispatching) overriden with code than makes it possible to send messages to the given ActorRef.
    * For example if there is a
