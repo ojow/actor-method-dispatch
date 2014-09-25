@@ -99,7 +99,7 @@ object ActorMethodDispatchMacros {
     import c.universe._
     val tpe = weakTypeOf[T]
 
-    val (tellMethods, askReplyMethods) = selectMethods(c)(tpe.members)
+    val (tellMethods, askReplyMethods, protectedAbstractMethods) = selectMethods(c)(tpe.members)
 
     def method2override(m: c.universe.MethodSymbol, body: (Tree, Tree) => Tree): Tree = {
       val (paramss, implicitParams) = paramLists(c)(m)
@@ -110,6 +110,8 @@ object ActorMethodDispatchMacros {
 
       q"override def ${m.name}(...$paramsDef)(implicit ..$implicitParamsDef) = ${body(q"$name", q"$argValues")}"
     }
+
+    val protectedAbstractOverrides = protectedAbstractMethods.map(m => method2override(m, (_, _) => q"proxyError"))
 
     val tellOverrides = tellMethods.map(m => method2override(m, (name, argValues) =>
       q"actorRef ! _root_.ojow.actor.AmcReplyToSender($name, $argValues)"))
@@ -132,7 +134,7 @@ object ActorMethodDispatchMacros {
         private def proxyError = throw new _root_.java.lang.RuntimeException("This method must not be called on a proxy.")
         override protected def actor = proxyError
         override protected def self = $ref
-        ..${tellOverrides ++ askReplyOverrides}
+        ..${tellOverrides ++ askReplyOverrides ++ protectedAbstractOverrides}
       }
     """
     }
@@ -181,7 +183,7 @@ object ActorMethodDispatchMacros {
    * Selects and validates methods suitable for message dispatching
    */
   private def selectMethods(c: blackbox.Context)(members: c.universe.MemberScope):
-        (Iterable[c.universe.MethodSymbol], Iterable[c.universe.MethodSymbol]) = {
+        (Iterable[c.universe.MethodSymbol], Iterable[c.universe.MethodSymbol], Iterable[c.universe.MethodSymbol]) = {
     import c.universe._
     def nameFilter(s: String): Boolean = s.startsWith(askMethodPrefix) || s.startsWith(tellMethodPrefix)
 
@@ -191,13 +193,19 @@ object ActorMethodDispatchMacros {
     val duplicates = ms.groupBy(m => m.name.decodedName.toString).collect { case (x, ys) if ys.size > 1 => x }
     if (duplicates.nonEmpty) reportError(c, s"Overloading is not supported. Overloaded methods: ${duplicates.mkString(", ")}")
 
-    val methods = ms.collect {
+    val reservedMethodNames = Set("self", "actor")
+    val protectedAbstractMethods = ms.collect {
+      case x if x.isMethod && x.isProtected && x.isAbstract &&
+        !reservedMethodNames.contains(x.name.decodedName.toString) => x.asMethod
+    }
+
+    val publicMethods = ms.collect {
       case x if x.isMethod && x.isPublic =>
         if (nameFilter(x.name.decodedName.toString)) x.asMethod
         else reportError(c,
           s"Illegal method: '${x.name}'. All public methods must either start with '$tellMethodPrefix' or '$askMethodPrefix'.")
     }
-    val (tellMethods, askMethods) = methods.partition(_.name.decodedName.toString.startsWith(tellMethodPrefix))
+    val (tellMethods, askMethods) = publicMethods.partition(_.name.decodedName.toString.startsWith(tellMethodPrefix))
 
     tellMethods.foreach { m =>
       if (m.returnType != typeOf[Unit])
@@ -209,7 +217,7 @@ object ActorMethodDispatchMacros {
         reportError(c, s"Method '${m.name}' must return a Reply.")
     }
 
-    (tellMethods, askMethods)
+    (tellMethods, askMethods, protectedAbstractMethods)
   }
 
   /**
@@ -218,7 +226,7 @@ object ActorMethodDispatchMacros {
    */
   private def methodsToCases(c: blackbox.Context)(tpe: c.universe.Type, selector: c.Tree): c.universe.Tree = {
     import c.universe._
-    val (tellMethods, askReplyMethods) = selectMethods(c)(tpe.members)
+    val (tellMethods, askReplyMethods, _) = selectMethods(c)(tpe.members)
 
     def methodToCase(m: MethodSymbol, methodCallHandler: (Option[c.Tree] => c.Tree, List[Symbol]) => c.Tree): Tree = {
       val (params, implicitParams) = paramLists(c)(m)
