@@ -18,7 +18,7 @@ class AskExceptionTest extends FunSuite with ScalaFutures {
 
     implicit val t = Timeout(1.second)
 
-    val myActor = actorMethodsProxy[CounterActorInterface](sys.actorOf(Props[CounterActor]))
+    val myActor = actorMethodsProxy[ExceptionActorInterface](sys.actorOf(Props[ExceptionActor]))
 
     // Exceptions inside 'ask' methods are automatically passed back
     val exceptionResult = myActor.askException.toFuture
@@ -33,14 +33,14 @@ class AskExceptionTest extends FunSuite with ScalaFutures {
 
 object AskExceptionTest {
 
-  class CounterActor extends Actor {
+  class ExceptionActor extends Actor {
 
-    override def receive = swappableMethods(new LinkedTo(this) with CounterActorInterface)
+    override def receive = swappableMethods(new LinkedTo(this) with ExceptionActorInterface)
 
   }
 
 
-  trait CounterActorInterface extends ActorMethodsOf[CounterActor] {
+  trait ExceptionActorInterface extends ActorMethodsOf[ExceptionActor] {
 
     def askException: Reply[Int] = throw new IllegalStateException("It is happening again.")
 
