@@ -139,7 +139,7 @@ object ActorMethodDispatchMacros {
       q""" new ${m.returnType} {
          override def value = proxyError
          override def handleWith(addr: _root_.ojow.actor.ReplyAddress[..$typeArgs],
-           exceptionHandler: _root_.ojow.actor.ReplyAddress[_root_.ojow.actor.Status.Status] = _root_.ojow.actor.ReplyAddress.replyToSender(None)): Unit = {
+           exceptionHandler: _root_.ojow.actor.ReplyAddress[_root_.akka.actor.Status.Status] = _root_.ojow.actor.ReplyAddress.replyToSender(None)): Unit = {
              actorRef ! _root_.ojow.actor.AmcWithReplyAddress($name, $argValues, addr, exceptionHandler)
          }
          override def toFuture: _root_.scala.concurrent.Future[..$typeArgs] =
