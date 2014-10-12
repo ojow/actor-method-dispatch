@@ -96,7 +96,7 @@ def askCollectData(implicit replyAddress: ActorMethodContext[String]): Reply[Str
   actor.replyAddress = Some(replyAddress)
 
   // Send a message along with meta info on how to handle the reply
-  provider.askIntData.handleWith(replyHandler(tellIntDataReply(someContext)))
+  provider.askIntData.handleReply(methodRefI(tellIntDataReply(someContext)))
 
   WillReplyLater
 }
@@ -110,7 +110,7 @@ def tellIntDataReply(context: SomeContext)(intData: Int): Unit = {
 // Using from outside is the same:
 val result: Future[String] = actor.askCollectData.toFuture
 // Or with another actor:
-actor.askCollectData.handleWith(methodRefI(anotherActor.tellAcceptStringData))
+actor.askCollectData.handleReply(methodRefI(anotherActor.tellAcceptStringData))
 ```
 
 See [tests](https://github.com/ojow/actor-method-dispatch/blob/master/src/test/scala/ojow/actor) for more examples.
