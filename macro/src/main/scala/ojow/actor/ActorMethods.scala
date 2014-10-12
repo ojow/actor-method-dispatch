@@ -7,9 +7,9 @@ trait ActorMethods {
   
   type ActorState <: Actor
 
-  protected def actor: ActorState
+  implicit def self: ActorRef
 
-  protected implicit def self: ActorRef
+  protected def actor: ActorState
 
   protected def proxyError = throw new RuntimeException("This method must not be called on a proxy.")
 

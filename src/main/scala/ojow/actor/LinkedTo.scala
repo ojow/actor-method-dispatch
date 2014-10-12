@@ -7,9 +7,9 @@ class LinkedTo[T <: Actor](a: T) extends ActorMethods {
 
   type ActorState = T
 
-  override protected def actor = a
+  override def self = actor.self
 
-  override protected def self = actor.self
+  override protected def actor = a
 
 }
 

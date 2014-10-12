@@ -88,8 +88,8 @@ object ActorMethodDispatchMacros {
 
     c.Expr[T] {q"""
       new $tpe {
+        override val self = $ref
         override protected def actor = proxyError
-        override protected val self = $ref
         ..${tellOverrides ++ askReplyOverrides ++ protectedAbstractOverrides}
       }
     """
