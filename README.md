@@ -88,10 +88,10 @@ myActor.askIncrementAndGet().ignoreReply()
 ### Handling replies with an Actor:
 ```scala
 // State inside the Actor:
-var replyAddress: Option[ReplyAddress[String]] = None
+var replyAddress: Option[ActorMethodContext[String]] = None
 
 // Methods inside the public interface trait:
-def askCollectData(implicit replyAddress: ReplyAddress[String]): Reply[String] = {
+def askCollectData(implicit replyAddress: ActorMethodContext[String]): Reply[String] = {
   // save reply address for later use
   actor.replyAddress = Some(replyAddress)
 
@@ -110,16 +110,16 @@ def tellIntDataReply(context: SomeContext)(intData: Int): Unit = {
 // Using from outside is the same:
 val result: Future[String] = actor.askCollectData.toFuture
 // Or with another actor:
-actor.askCollectData.handleWith(replyHandler(anotherActor.tellAcceptStringData))
+actor.askCollectData.handleWith(methodRefI(anotherActor.tellAcceptStringData))
 ```
 
 See [tests](https://github.com/ojow/actor-method-dispatch/blob/master/src/test/scala/ojow/actor) for more examples.
 
 ### How it works
 There are 3 kind of macros:
-  1. For creating proxies. They just override methods on your trait with code to send `ActorMethodCall` messages.
-  2. For creating `Receive`s. They build a `Receive` from a list of `case` clauses to match `ActorMethodCall` messages and call respective methods.
-  3. For creating `ReplyAddress`es (to handle replies) from curried method calls (without the last argument list).
+  1. For creating proxies. They just override methods on your trait with code to send respective messages.
+  2. For creating `Receive`s. They build a `Receive` from a list of `case` clauses to match messages and call respective methods.
+  3. For creating `AMRxx` classes from full or curried method calls (without the last argument list).
 
 See [macro sources](https://github.com/ojow/actor-method-dispatch/blob/master/macro/src/main/scala/ojow/actor) for details.
 

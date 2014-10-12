@@ -10,9 +10,10 @@ import com.typesafe.sbt.SbtMultiJvm.MultiJvmKeys.MultiJvm
 object ActorMethodDispatch extends Build {
    val akkaVersion = "2.3.6"
 
-   lazy val main = Project("main", file(".")).dependsOn(macroSub, commonSub).settings(SbtMultiJvm.multiJvmSettings: _*).
+   lazy val main = Project("main", file(".")).dependsOn(macroSub).settings(SbtMultiJvm.multiJvmSettings: _*).
                                               settings(sonatypeSettings: _*).settings(
      scalaVersion in Global := "2.11.2",
+     scalacOptions in Global += "-feature",
      organization in Global := "net.ogalako",
      version in Global := "0.3-SNAPSHOT",
      name := "actor-method-dispatch",
@@ -40,8 +41,6 @@ object ActorMethodDispatch extends Build {
 
      mappings in (Compile, packageBin) ++= mappings.in(macroSub, Compile, packageBin).value,
      mappings in (Compile, packageSrc) ++= mappings.in(macroSub, Compile, packageSrc).value,
-     mappings in (Compile, packageBin) ++= mappings.in(commonSub, Compile, packageBin).value,
-     mappings in (Compile, packageSrc) ++= mappings.in(commonSub, Compile, packageSrc).value,
 
      publishArtifact in Test := false,
      pomExtra := {
@@ -73,19 +72,14 @@ object ActorMethodDispatch extends Build {
        }
        filt(xi)
      }
-   ).aggregate(macroSub, commonSub).configs(MultiJvm)
+   ).aggregate(macroSub).configs(MultiJvm)
 
-   lazy val commonSub = Project("common", file("common")) settings(
+   lazy val macroSub = Project("macro", file("macro")) settings(
      publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo"))),
      publishArtifact := false,
      libraryDependencies ++= Seq(
-       "com.typesafe.akka" %% "akka-actor" % akkaVersion
+       "com.typesafe.akka" %% "akka-actor" % akkaVersion,
+       "org.scala-lang" % "scala-reflect" % scalaVersion.value
      )
-   )
-
-   lazy val macroSub = Project("macro", file("macro")) dependsOn(commonSub) settings(
-     publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo"))),
-     publishArtifact := false,
-     libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value
    )
 }

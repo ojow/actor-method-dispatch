@@ -30,12 +30,12 @@ object MultiNodeSample {
 
     def tellSetData(data: String): Unit = { actor.dataProvider.tellSetData(data) }
 
-    def askData(implicit replyTo: ReplyAddress[String]): Reply[String] = {
-      actor.dataProvider.askData("a string from client").handleWith(replyHandler(tellAcceptDataFromProvider(replyTo)))
+    def askData(implicit replyTo: ActorMethodContext[String]): Reply[String] = {
+      actor.dataProvider.askData("a string from client").handleReply(methodRefI(self, tellAcceptDataFromProvider(replyTo)))
       WillReplyLater
     }
 
-    def tellAcceptDataFromProvider(replyTo: ReplyAddress[String])(data: String): Unit = {
+    def tellAcceptDataFromProvider(replyTo: ActorMethodContext[String])(data: String): Unit = {
       replyTo.sendReply(data)
     }
     
@@ -87,7 +87,7 @@ class MultiNodeSample extends MultiNodeSpec(MultiNodeSampleConfig) with STMultiN
         val provider = actorMethodsProxy[ProviderInterface](providerActor)
         val client = actorMethodsProxy[ClientInterface](system.actorOf(Props(classOf[ClientActor], provider), "client"))
         client.tellSetData("some data")
-        client.askData.handleWith(new ReplyAddress(Some(self), None))
+        client.askData.handleReply(ReplyToSender)
         expectMsg("data with param = a string from client: some data")
       }
 

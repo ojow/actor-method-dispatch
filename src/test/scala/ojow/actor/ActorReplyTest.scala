@@ -26,7 +26,7 @@ class ActorReplyTest extends FunSuite with ScalaFutures {
 class DataAggregatorActor(val providers: List[DataProviderInterface]) extends
                     ActorWithMethods[DataAggregatorActor] with DataAggregatorInterface {
 
-  var replyAddress: Option[ReplyAddress[String]] = None
+  var replyAddress: Option[ActorMethodContext[String]] = None
 
   var intData = Map[Int, Int]()
 
@@ -43,10 +43,10 @@ class DataAggregatorActor(val providers: List[DataProviderInterface]) extends
 
 trait DataAggregatorInterface extends ActorMethodsOf[DataAggregatorActor] {
   
-  def askCollectData(implicit replyAddress: ReplyAddress[String]): Reply[String] = {
+  def askCollectData(implicit replyAddress: ActorMethodContext[String]): Reply[String] = {
     for ((provider, id) <- actor.providers.zipWithIndex) {
-      provider.askIntData.handleWith(replyHandler(tellIntDataReply(id)))
-      provider.askStringData.handleWith(replyHandler(tellStringDataReply(id)))
+      provider.askIntData.handleReply(methodRefI(self, tellIntDataReply(id)))
+      provider.askStringData.handleReply(methodRefI(self, tellStringDataReply(id)))
     }
     actor.replyAddress = Some(replyAddress)
     WillReplyLater

@@ -18,14 +18,6 @@ object ActorMethodDispatchMacros {
   /**
    * Return a set of { case ... => ... } clauses which is a Receive that matches ActorMethodCall messages and
    * calls corresponding methods on 'this'.
-   * For example if there is a
-   *     trait ActorInterface extends ActorMethods { def tellDoSomething(): Unit = ??? }
-   * and we call
-   *     selfMethods[ActorInterface]
-   * the macro returns
-   *     {
-   *       case ActorMethodCall("tellDoSomething", args, rawReplyAddr, rawExceptionHandler) => tellDoSomething()
-   *     }
    */
   def selfMethods[T <: ActorMethods]: Actor.Receive = macro selfMethodsImpl[T]
 
@@ -39,16 +31,6 @@ object ActorMethodDispatchMacros {
 
   /**
    * Works similar to 'selfMethods' except methods are called on the given object.
-   * So the returned expression looks like this:
-   *
-   *   new PartialFunction[Any, Unit] {
-   *     val methodsObj = theGivenObject
-   *     val recv: Receive = {
-   *       case ActorMethodCall("tellDoSomething", args, rawReplyAddr, rawExceptionHandler) => methodsObj.tellDoSomething()
-   *     }
-   *     override def isDefinedAt(x: Any) = recv.isDefinedAt(x)
-   *     override def apply(v1: Any) = recv.apply(v1)
-   *   }
    */
   def swappableMethods[T <: ActorMethods](obj: => T): Actor.Receive =
     macro swappableMethodsImpl[T]
@@ -70,50 +52,12 @@ object ActorMethodDispatchMacros {
 
 
   /**
-   * Returns message that is used to call the given method
-   */
-  def msgFor(method: => Any): AmcReplyToSender = macro msgForImpl
-
-  def msgForImpl(c: blackbox.Context)(method: c.Tree): c.Expr[AmcReplyToSender] = {
-    import c.universe._
-
-    method match {
-      case q"$selector.$name(...$params)" =>
-        val args = q"List(..${params.map(xs => q"List(..$xs)")})"
-        val nameLiteral = Literal(Constant(name.decodedName.toString))
-        c.Expr[AmcReplyToSender](q"_root_.ojow.actor.AmcReplyToSender($nameLiteral, $args)")
-
-      case _ => reportError(c, "msgFor's argument must be a method call.")
-    }
-  }
-
-  /**
    * Returns an anonymous class instantion expression. The class is the given 'T' with methods (suitable for message
    * dispatching) overriden with code than makes it possible to send messages to the given ActorRef.
-   * For example if there is a
-   *     trait ActorInterface extends ActorMethods {
-   *       def tellDoSomething(): Unit = ???
-   *       def askGetSomething = Reply(1)
-   *     }
-   * and we call
-   *     actorMethodsProxy[ActorInterface](someActor)
-   * the macro returns the following expression:
-   *     new ActorInterface {
-   *       override def tellDoSomething(): Unit = { someActor ! AmcReplyToSender("tellDoSomething", List(List()))
-   *       override def askGetSomething: Reply[Int] = new Reply[Int] {
-   *         override def value = proxyError
-   *         override def handleWith(addr: ReplyAddress[Int], exceptionHandler: ReplyAddress[Status.Status] = ReplyAddress.replyToSender(None)): Unit = {
-   *             actorRef ! AmcWithReplyAddress("askGetSomething", Nil, addr, exceptionHandler)
-   *         }
-   *         override def toFuture: Future[Int] = ask(actorRef, AmcReplyToSender("askGetSomething", Nil))(askTimeout).asInstanceOf[Future[Int]]
-   *       }
-   *     }
    */
-  def actorMethodsProxy[T <: ActorMethods](ref: ActorRef)(implicit askTimeout: Timeout,
-                                                          ec: ExecutionContext): T = macro actorMethodsProxyImpl[T]
+  def actorMethodsProxy[T <: ActorMethods](ref: ActorRef): T = macro actorMethodsProxyImpl[T]
 
-  def actorMethodsProxyImpl[T <: ActorMethods : c.WeakTypeTag](c: blackbox.Context)(ref: c.Expr[ActorRef])(
-                                            askTimeout: c.Expr[Timeout], ec: c.Expr[ExecutionContext]): c.Expr[T] = {
+  def actorMethodsProxyImpl[T <: ActorMethods : c.WeakTypeTag](c: blackbox.Context)(ref: c.Expr[ActorRef]): c.Expr[T] = {
     import c.universe._
     val tpe = weakTypeOf[T]
 
@@ -123,7 +67,7 @@ object ActorMethodDispatchMacros {
       val (paramss, implicitParams) = paramLists(c)(m)
       val paramsDef = paramss.map(_.map(sym => q"${sym.name.toTermName}: ${sym.typeSignature}"))
       val implicitParamsDef = implicitParams.map(sym => q"${sym.name.toTermName}: ${sym.typeSignature}")
-      val argValues = q"List(..${m.paramLists.map(xs => q"List(..${xs.map(sym => q"${sym.name.toTermName}")})")})"
+      val argValues = q"_root_.ojow.actor.ActorMethod.ParamsCollection(..${m.paramLists.flatten.map(sym => q"${sym.name.toTermName}")})"
       val name = Literal(Constant(m.name.decodedName.toString))
 
       q"override def ${m.name}(...$paramsDef)(implicit ..$implicitParamsDef) = ${body(q"$name", q"$argValues")}"
@@ -132,26 +76,20 @@ object ActorMethodDispatchMacros {
     val protectedAbstractOverrides = protectedAbstractMethods.map(m => method2override(m, (_, _) => q"proxyError"))
 
     val tellOverrides = tellMethods.map(m => method2override(m, (name, argValues) =>
-      q"actorRef ! _root_.ojow.actor.AmcReplyToSender($name, $argValues)"))
+      q"""self ! _root_.ojow.actor.AMR(self, $name, $argValues)"""))
 
     val askReplyOverrides = askReplyMethods.map(m => method2override(m, (name, argValues) => {
-      val typeArgs = m.returnType.typeArgs.map(x => tq"$x")
       q""" new ${m.returnType} {
          override def value = proxyError
-         override def handleWith(addr: _root_.ojow.actor.ReplyAddress[..$typeArgs],
-           exceptionHandler: _root_.ojow.actor.ReplyAddress[_root_.akka.actor.Status.Status] = _root_.ojow.actor.ReplyAddress.replyToSender(None)): Unit = {
-             actorRef ! _root_.ojow.actor.AmcWithReplyAddress($name, $argValues, addr, exceptionHandler)
-         }
-         override def toFuture: _root_.scala.concurrent.Future[..$typeArgs] =
-           _root_.akka.pattern.ask(actorRef, _root_.ojow.actor.AmcReplyToSender($name, $argValues))($askTimeout).
-             asInstanceOf[_root_.scala.concurrent.Future[..$typeArgs]]
+         override def actorRef = self
+         override def methodName: String = $name
+         override def params: _root_.ojow.actor.ActorMethod.ParamsCollection[Any] = $argValues
       } """}))
 
     c.Expr[T] {q"""
-      new _root_.ojow.actor.ActorRefWithMethods($ref) with $tpe {
-        private def proxyError = throw new _root_.java.lang.RuntimeException("This method must not be called on a proxy.")
+      new $tpe {
         override protected def actor = proxyError
-        override protected def self = $ref
+        override protected val self = $ref
         ..${tellOverrides ++ askReplyOverrides ++ protectedAbstractOverrides}
       }
     """
@@ -159,34 +97,84 @@ object ActorMethodDispatchMacros {
 
   }
 
-  /**
-   * Converts a method call without last parameter list to creation of a corresponding ReplyAddress.
-   * For example if there is a
-   *     def tellAcceptInt(context: MyContext)(value: Int)
-   * and we call
-   *     replyHandler(actorMethods.tellAcceptInt(myContext))
-   * we get
-   *     new ReplyAddress(Some(actorMethods.self), Some(new CurriedActorMethodCall("tellAcceptInt", List(List(context)))))
-   */
-  def replyHandler[T](f: T => Unit): ReplyAddress[T] = macro replyHandlerImpl[T]
 
-  def replyHandlerImpl[T : c.WeakTypeTag](c: blackbox.Context)(f: c.Expr[T => Unit]): c.Expr[ReplyAddress[T]] = {
+  def methodRefIO[I, O](ref: ActorRef, method: I => Reply[O]): IOAMR[I, O] = macro methodRefImplIO[I, O]
+
+  def methodRefImplIO[I, O](c: blackbox.Context)(ref: c.Tree, method: c.Tree): c.Expr[IOAMR[I, O]] = {
     import c.universe._
-    val tpe = weakTypeOf[T]
 
-    f.tree match {
-      case q"{((${q"$mods val $tname: $tpt = $expr"}) => $selector.${mname: TermName}(...$args)(${lastArg: TermName}))}" if tname == lastArg =>
-        val name = Literal(Constant(mname.decodedName.toString))
-        c.Expr[ReplyAddress[T]](
-          q"""new _root_.ojow.actor.ReplyAddress[$tpe](Some($selector.self),
-             Some(new _root_.ojow.actor.CurriedActorMethodCall[$tpe]($name, $args)))""")
+    c.Expr[IOAMR[I, O]](currMref(c)(method, (nameLiteral, args) => q"_root_.ojow.actor.IOAMR($ref, $nameLiteral, $args)"))
+  }
 
-      case _ => reportError(c, "replyHandler argument must look like a method call without last argument list.")
+
+  def methodRefI[I, T](ref: ActorRef, method: I => T)(implicit ev: T =:= Unit): IAMR[I] = macro methodRefImplI[I]
+
+  def methodRefImplI[I](c: blackbox.Context)(ref: c.Tree, method: c.Tree)(ev: c.Tree): c.Expr[IAMR[I]] = {
+    import c.universe._
+
+    c.Expr[IAMR[I]](currMref(c)(method, (nameLiteral, args) => q"_root_.ojow.actor.IAMR($ref, $nameLiteral, $args)"))
+  }
+
+
+  def methodRefO[O](ref: ActorRef, method: => Reply[O]): OAMR[O] = macro methodRefImplO[O]
+
+  def methodRefImplO[O](c: blackbox.Context)(ref: c.Tree, method: c.Tree): c.Expr[OAMR[O]] = {
+    import c.universe._
+
+    c.Expr[OAMR[O]](mref(c)(method, (nameLiteral, args) => q"_root_.ojow.actor.OAMR($ref, $nameLiteral, $args)"))
+  }
+
+
+  def methodRef[T](ref: ActorRef, method: => T)(implicit ev: T =:= Unit): AMR = macro methodRefImpl
+
+  def methodRefImpl(c: blackbox.Context)(ref: c.Tree, method: c.Tree)(ev: c.Tree): c.Expr[AMR] = {
+    import c.universe._
+
+    c.Expr[AMR](mref(c)(method, (nameLiteral, args) => q"_root_.ojow.actor.AMR($ref, $nameLiteral, $args)"))
+  }
+
+
+  private def mref(c: blackbox.Context)(method: c.Tree, result: (c.Tree, c.Tree) => c.Tree): c.Tree = {
+    import c.universe._
+
+    method match {
+      case q"$selector.$name(...$argss)" =>
+        val args = q"_root_.ojow.actor.ActorMethod.ParamsCollection(..${argss.flatten})"
+        val nameLiteral = Literal(Constant(name.decodedName.toString))
+        result(nameLiteral, args)
+
+      case _ => reportError(c, "The argument must be a method call.")
     }
   }
 
 
-  private def reportError(c: blackbox.Context, msg: String): Nothing = c.abort(c.enclosingPosition, msg)
+  private def currMref(c: blackbox.Context)(method: c.Tree, result: (c.Tree, c.Tree) => c.Tree): c.Tree = {
+    import c.universe._
+
+    def failed = reportError(c, "The argument must look like a method call without the last argument list.")
+
+    method match {
+      case q"{((${q"$mods val $tname: $tpt = $expr"}) => $selector.${mname: TermName}(...$argss))}" =>
+        val argsToPass: List[c.Tree] = {
+          def isFuncArg(tree: Option[List[c.Tree]]): Boolean = tree match {
+            case Some(List(q"${tn: TermName}")) if tn == tname => true
+            case _ => false
+          }
+          if (isFuncArg(argss.lastOption)) argss.init.flatten
+          else if (isFuncArg(argss.init.lastOption)) argss.init.init.flatten
+          else failed
+        }
+
+        val args = q"_root_.ojow.actor.ActorMethod.ParamsCollection(..$argsToPass)"
+        val nameLiteral = Literal(Constant(mname.decodedName.toString))
+        result(nameLiteral, args)
+
+      case _ => failed
+    }
+  }
+
+
+  private[actor] def reportError(c: blackbox.Context, msg: String): Nothing = c.abort(c.enclosingPosition, msg)
 
   /**
    * Partitions regular and implicit parameters of a method
@@ -248,34 +236,34 @@ object ActorMethodDispatchMacros {
 
     def methodToCase(m: MethodSymbol, methodCallHandler: (Option[c.Tree] => c.Tree, List[Symbol]) => c.Tree): Tree = {
       val (params, implicitParams) = paramLists(c)(m)
+      val paramListLengths = params.map(_.length).toIndexedSeq
       val methodParams = params.zipWithIndex.map {
         case (xs, i) => xs.zipWithIndex.map {
-          case (param, j) => q"args($i)($j).asInstanceOf[${param.typeSignature}]"
+          case (param, j) => q"args(${paramListLengths.take(i).sum} + $j).asInstanceOf[${param.typeSignature}]"
         }
       }
 
       val methodNamePattern = pq"${m.name.decodedName.toString}"
       val handler = methodCallHandler(impls => q"$selector.${m.name}(...${impls.map(i => methodParams :+ List(i)).getOrElse(methodParams)})", implicitParams)
-      cq"""_root_.ojow.actor.ActorMethodCall($methodNamePattern, args, rawReplyAddr, rawExceptionHandler) => $handler"""
+      cq"""msg@_root_.ojow.actor.ActorMethod($methodNamePattern, args, _, _) => $handler"""
     }
 
     val tellCases = tellMethods.map(methodToCase(_, (call, _) => call(None)))
 
     val askReplyCases = askReplyMethods.map(methodToCase(_, (call, implParams) => {
-      val replyAddress =  if (implParams.nonEmpty) Some(q"replyAddr") else None // TODO: correct check
+      val amCtx =  if (implParams.nonEmpty) Some(q"amCtx") else None // TODO: correct check
 
       q"""
-        val replyAddr = rawReplyAddr.asInstanceOf[_root_.ojow.actor.ReplyAddress[Any]].fillRef(sender())
-        val exceptionHandler = rawExceptionHandler.asInstanceOf[_root_.ojow.actor.ReplyAddress[Any]].fillRef(sender())
+        val amCtx = _root_.ojow.actor.ActorMethodContext(sender(), msg)
         try {
-          val result = ${call(replyAddress)}
+          val result = ${call(amCtx)}
           if (result != _root_.ojow.actor.WillReplyLater) {
-            replyAddr.sendReply(result.value)
+            amCtx.sendReply(result.value)
           }
         }
         catch {
           case e: _root_.java.lang.Exception =>
-            exceptionHandler.sendReply(_root_.akka.actor.Status.Failure(e))
+            amCtx.sendException(_root_.akka.actor.Status.Failure(e))
             throw e
         }
       """}))

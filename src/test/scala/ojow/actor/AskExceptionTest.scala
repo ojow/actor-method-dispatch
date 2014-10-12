@@ -1,6 +1,5 @@
 package ojow.actor
 
-import akka.testkit.{EventFilter, TestEvent}
 import akka.util.Timeout
 import org.scalatest.FunSuite
 import org.scalatest.concurrent.ScalaFutures
@@ -26,6 +25,13 @@ class AskExceptionTest extends FunSuite with ScalaFutures {
       assert(e.isInstanceOf[IllegalStateException])
     }
 
+
+    //methodRefIO(myActor.askTest("a")(1))
+    //methodRef((x: Long) => myActor.askTest("a")(1)(x))
+
+    //val a = AMC[Int, Unit](null, Array(), Array(), None)
+    //a("a")
+
     sys.shutdown()
   }
 }
@@ -43,6 +49,8 @@ object AskExceptionTest {
   trait ExceptionActorInterface extends ActorMethodsOf[ExceptionActor] {
 
     def askException: Reply[Int] = throw new IllegalStateException("It is happening again.")
+
+    def askTest(s: String)(i: Int)(l: Long): Reply[Int] = ???
 
   }
 
