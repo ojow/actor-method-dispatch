@@ -31,7 +31,7 @@ object MultiNodeSample {
     def tellSetData(data: String): Unit = { actor.dataProvider.tellSetData(data) }
 
     def askData(implicit replyTo: ActorMethodContext[String]): Reply[String] = {
-      actor.dataProvider.askData("a string from client").handleReply(methodRefI(self, tellAcceptDataFromProvider(replyTo)))
+      actor.dataProvider.askData("a string from client").handleReply(methodRefI(tellAcceptDataFromProvider(replyTo)))
       WillReplyLater
     }
 

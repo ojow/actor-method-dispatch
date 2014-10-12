@@ -45,8 +45,8 @@ trait DataAggregatorInterface extends ActorMethodsOf[DataAggregatorActor] {
   
   def askCollectData(implicit replyAddress: ActorMethodContext[String]): Reply[String] = {
     for ((provider, id) <- actor.providers.zipWithIndex) {
-      provider.askIntData.handleReply(methodRefI(self, tellIntDataReply(id)))
-      provider.askStringData.handleReply(methodRefI(self, tellStringDataReply(id)))
+      provider.askIntData.handleReply(methodRefI(tellIntDataReply(id)))
+      provider.askStringData.handleReply(methodRefI(tellStringDataReply(id)))
     }
     actor.replyAddress = Some(replyAddress)
     WillReplyLater

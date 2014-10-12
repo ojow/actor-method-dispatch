@@ -58,12 +58,12 @@ object UncurryTest {
 
     protected def provideUserForRequestHandler(handler: IOAMR[(User, WebRequest), WebResponse]):
                                                                                       IOAMR[WebRequest, WebResponse] = {
-      methodRefIO(self, askRequestWithUserHandler(handler))
+      methodRefIO(askRequestWithUserHandler(handler))
     }
 
     def askRequestWithUserHandler(handler: IOAMR[(User, WebRequest), WebResponse])(request: WebRequest)(implicit
                                                        replyTo: ActorMethodContext[WebResponse]): Reply[WebResponse] = {
-      actor.userProvider.askGetUserForRequest(request).handleReply(methodRefI(self,
+      actor.userProvider.askGetUserForRequest(request).handleReply(methodRefI(
         tellRequestWithUserApplyUser(handler, request, replyTo)))
       WillReplyLater
     }
@@ -80,7 +80,7 @@ object UncurryTest {
                                                                      LoggedInRequestHandlerActorMethods[HomePageActor] {
 
     override def askProcessRequest(request: WebRequest)(implicit replyTo: ActorMethodContext[WebResponse]): Reply[WebResponse] = {
-      provideUserForRequestHandler(methodRefIO(self, askRenderHomePage)).uncurry(request).pipeTo(replyTo).run()
+      provideUserForRequestHandler(methodRefIO(askRenderHomePage)).uncurry(request).pipeTo(replyTo).run()
       WillReplyLater
     }
 

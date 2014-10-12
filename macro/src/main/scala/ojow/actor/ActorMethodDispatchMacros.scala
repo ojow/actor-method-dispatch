@@ -98,57 +98,58 @@ object ActorMethodDispatchMacros {
   }
 
 
-  def methodRefIO[I, O](ref: ActorRef, method: I => Reply[O]): IOAMR[I, O] = macro methodRefImplIO[I, O]
+  def methodRefIO[I, O](method: I => Reply[O]): IOAMR[I, O] = macro methodRefImplIO[I, O]
 
-  def methodRefImplIO[I, O](c: blackbox.Context)(ref: c.Tree, method: c.Tree): c.Expr[IOAMR[I, O]] = {
+  def methodRefImplIO[I, O](c: blackbox.Context)(method: c.Tree): c.Expr[IOAMR[I, O]] = {
     import c.universe._
 
-    c.Expr[IOAMR[I, O]](currMref(c)(method, (nameLiteral, args) => q"_root_.ojow.actor.IOAMR($ref, $nameLiteral, $args)"))
+    c.Expr[IOAMR[I, O]](currMref(c)(method, (ref, nameLiteral, args) => q"_root_.ojow.actor.IOAMR($ref, $nameLiteral, $args)"))
   }
 
 
-  def methodRefI[I, T](ref: ActorRef, method: I => T)(implicit ev: T =:= Unit): IAMR[I] = macro methodRefImplI[I]
+  def methodRefI[I, T](method: I => T)(implicit ev: T =:= Unit): IAMR[I] = macro methodRefImplI[I]
 
-  def methodRefImplI[I](c: blackbox.Context)(ref: c.Tree, method: c.Tree)(ev: c.Tree): c.Expr[IAMR[I]] = {
+  def methodRefImplI[I](c: blackbox.Context)(method: c.Tree)(ev: c.Tree): c.Expr[IAMR[I]] = {
     import c.universe._
 
-    c.Expr[IAMR[I]](currMref(c)(method, (nameLiteral, args) => q"_root_.ojow.actor.IAMR($ref, $nameLiteral, $args)"))
+    c.Expr[IAMR[I]](currMref(c)(method, (ref, nameLiteral, args) => q"_root_.ojow.actor.IAMR($ref, $nameLiteral, $args)"))
   }
 
 
-  def methodRefO[O](ref: ActorRef, method: => Reply[O]): OAMR[O] = macro methodRefImplO[O]
+  def methodRefO[O](method: => Reply[O]): OAMR[O] = macro methodRefImplO[O]
 
-  def methodRefImplO[O](c: blackbox.Context)(ref: c.Tree, method: c.Tree): c.Expr[OAMR[O]] = {
+  def methodRefImplO[O](c: blackbox.Context)(method: c.Tree): c.Expr[OAMR[O]] = {
     import c.universe._
 
-    c.Expr[OAMR[O]](mref(c)(method, (nameLiteral, args) => q"_root_.ojow.actor.OAMR($ref, $nameLiteral, $args)"))
+    c.Expr[OAMR[O]](mref(c)(method, (ref, nameLiteral, args) => q"_root_.ojow.actor.OAMR($ref, $nameLiteral, $args)"))
   }
 
 
-  def methodRef[T](ref: ActorRef, method: => T)(implicit ev: T =:= Unit): AMR = macro methodRefImpl
+  def methodRef[T](method: => T)(implicit ev: T =:= Unit): AMR = macro methodRefImpl
 
-  def methodRefImpl(c: blackbox.Context)(ref: c.Tree, method: c.Tree)(ev: c.Tree): c.Expr[AMR] = {
+  def methodRefImpl(c: blackbox.Context)(method: c.Tree)(ev: c.Tree): c.Expr[AMR] = {
     import c.universe._
 
-    c.Expr[AMR](mref(c)(method, (nameLiteral, args) => q"_root_.ojow.actor.AMR($ref, $nameLiteral, $args)"))
+    c.Expr[AMR](mref(c)(method, (ref, nameLiteral, args) => q"_root_.ojow.actor.AMR($ref, $nameLiteral, $args)"))
   }
 
 
-  private def mref(c: blackbox.Context)(method: c.Tree, result: (c.Tree, c.Tree) => c.Tree): c.Tree = {
+  private def mref(c: blackbox.Context)(method: c.Tree, result: (c.Tree, c.Tree, c.Tree) => c.Tree): c.Tree = {
     import c.universe._
 
     method match {
       case q"$selector.$name(...$argss)" =>
         val args = q"_root_.ojow.actor.ActorMethod.ParamsCollection(..${argss.flatten})"
         val nameLiteral = Literal(Constant(name.decodedName.toString))
-        result(nameLiteral, args)
+        val ref = q"$selector.self"
+        result(ref, nameLiteral, args)
 
       case _ => reportError(c, "The argument must be a method call.")
     }
   }
 
 
-  private def currMref(c: blackbox.Context)(method: c.Tree, result: (c.Tree, c.Tree) => c.Tree): c.Tree = {
+  private def currMref(c: blackbox.Context)(method: c.Tree, result: (c.Tree, c.Tree, c.Tree) => c.Tree): c.Tree = {
     import c.universe._
 
     def failed = reportError(c, "The argument must look like a method call without the last argument list.")
@@ -167,7 +168,8 @@ object ActorMethodDispatchMacros {
 
         val args = q"_root_.ojow.actor.ActorMethod.ParamsCollection(..$argsToPass)"
         val nameLiteral = Literal(Constant(mname.decodedName.toString))
-        result(nameLiteral, args)
+        val ref = q"$selector.self"
+        result(ref, nameLiteral, args)
 
       case _ => failed
     }
