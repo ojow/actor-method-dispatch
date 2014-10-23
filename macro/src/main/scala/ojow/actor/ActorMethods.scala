@@ -11,7 +11,14 @@ trait ActorMethods {
 
   protected def actor: ActorState
 
+}
+
+
+trait ActorMethodsProxy extends ActorMethods {
+
   protected def proxyError = throw new RuntimeException("This method must not be called on a proxy.")
+
+  override protected def actor = proxyError
 
 }
 

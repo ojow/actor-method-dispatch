@@ -87,9 +87,8 @@ object ActorMethodDispatchMacros {
       } """}))
 
     c.Expr[T] {q"""
-      new $tpe {
+      new $tpe with _root_.ojow.actor.ActorMethodsProxy {
         override val self = $ref
-        override protected def actor = proxyError
         ..${tellOverrides ++ askReplyOverrides ++ protectedAbstractOverrides}
       }
     """
