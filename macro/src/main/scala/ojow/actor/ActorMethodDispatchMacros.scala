@@ -55,9 +55,9 @@ object ActorMethodDispatchMacros {
    * Returns an anonymous class instantion expression. The class is the given 'T' with methods (suitable for message
    * dispatching) overriden with code than makes it possible to send messages to the given ActorRef.
    */
-  def actorMethodsProxy[T <: ActorMethods](ref: ActorRef): T = macro actorMethodsProxyImpl[T]
+  def actorMethodsProxy[T <: ActorMethods](ref: ActorRef): T with ActorMethodsProxy = macro actorMethodsProxyImpl[T]
 
-  def actorMethodsProxyImpl[T <: ActorMethods : c.WeakTypeTag](c: blackbox.Context)(ref: c.Expr[ActorRef]): c.Expr[T] = {
+  def actorMethodsProxyImpl[T <: ActorMethods : c.WeakTypeTag](c: blackbox.Context)(ref: c.Expr[ActorRef]): c.Expr[T with ActorMethodsProxy] = {
     import c.universe._
     val tpe = weakTypeOf[T]
 
@@ -86,7 +86,7 @@ object ActorMethodDispatchMacros {
          override def params: _root_.ojow.actor.ActorMethod.ParamsCollection[Any] = $argValues
       } """}))
 
-    c.Expr[T] {q"""
+    c.Expr[T with ActorMethodsProxy] {q"""
       new $tpe with _root_.ojow.actor.ActorMethodsProxy {
         override val self = $ref
         ..${tellOverrides ++ askReplyOverrides ++ protectedAbstractOverrides}
